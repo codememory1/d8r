@@ -1,0 +1,50 @@
+postgres:
+  # PostgreSQL hostname.
+  # Use "postgres" only when the application runs inside Docker Compose.
+  host: "localhost"
+
+  # PostgreSQL server port.
+  port: 5432
+
+  # Database user.
+  user: "root"
+
+  # Database password.
+  # Suitable only for local development.
+  password: "admin"
+
+  # Database name.
+  database: "postgres"
+
+http:
+  # Address on which the HTTP server listens.
+  # 0.0.0.0 makes it available on all network interfaces.
+  address: "0.0.0.0"
+
+  # HTTP server port.
+  port: 8080
+
+  # Maximum duration for reading an HTTP request.
+  read_timeout: "10s"
+
+  # Maximum duration for writing an HTTP response.
+  write_timeout: "20s"
+
+  # Maximum duration to keep an idle connection open.
+  idle_timeout: "20s"
+
+download:
+  # Minimum resource size required to consider parallel downloading.
+  min_parallel_size: "50MiB"
+
+  # Buffer size used while copying response data to storage.
+  buffer_size: "256KiB"
+
+  # Target size of an individual download part.
+  part_size: "5MiB"
+
+  # Maximum number of parts downloaded concurrently.
+  max_parallel_parts: 5
+
+  # Number of byte ranges into which a resource is divided.
+  range_parts: 5
