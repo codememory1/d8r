@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/codememory1/d8r/internal/infrastructure/config"
@@ -64,9 +65,11 @@ func (p *ConnectionPool) RunTransaction(ctx context.Context, fn func(tx pgx.Tx) 
 	}
 
 	if err := fn(tx); err != nil {
-		if err := tx.Rollback(ctx); err != nil {
-			return err
+		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
+			return errors.Join(err, rollbackErr)
 		}
+
+		return err
 	}
 
 	return tx.Commit(ctx)
