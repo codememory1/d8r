@@ -3,13 +3,17 @@ package bootstrap
 import (
 	"context"
 	"log/slog"
+	"net/http"
 
 	"github.com/codememory1/d8r/internal/application/command"
 	"github.com/codememory1/d8r/internal/application/query"
 	"github.com/codememory1/d8r/internal/infrastructure/config"
+	"github.com/codememory1/d8r/internal/infrastructure/httpdownload"
 	"github.com/codememory1/d8r/internal/infrastructure/persistence/postgres"
 	"github.com/codememory1/d8r/internal/infrastructure/persistence/postgres/repository"
+	"github.com/codememory1/d8r/internal/infrastructure/storage/filesystem"
 	"github.com/codememory1/d8r/internal/presentation/http/controller"
+	"github.com/codememory1/d8r/internal/presentation/worker"
 	"github.com/codememory1/d8r/pkg/restful"
 	"github.com/codememory1/d8r/pkg/restful/respond"
 )
@@ -17,6 +21,10 @@ import (
 // Controllers contains the application's HTTP controllers.
 type Controllers struct {
 	Task *controller.TaskController
+}
+
+type Workers struct {
+	DownloadTask *worker.DownloadTaskWorker
 }
 
 // App contains the application's configuration, infrastructure dependencies,
@@ -27,6 +35,7 @@ type App struct {
 	Logger         *slog.Logger
 	HandlerAdapter *restful.HandlerAdapter
 	Controllers    Controllers
+	Workers        Workers
 }
 
 // NewApp initializes the application and composes its dependencies.
@@ -69,14 +78,33 @@ func (a *App) compose() error {
 
 	// Init Repositories
 	taskRepository := repository.NewTaskRepository(a.Pool)
+	taskInspectionRepository := repository.NewTaskInspectionRepository(a.Pool)
+
+	// Init clients
+	client := http.Client{}
+
+	// Init Storages
+	fsStorage := filesystem.NewStorage("./files")
+
+	// Init Downloader
+	httpDownloader := httpdownload.NewHttpDownloader(&client, fsStorage, &a.Config.Download)
 
 	// Init Query/Command Handlers
 	createTaskHandler := command.NewCreateTaskHandler(taskRepository)
 	getTaskHandler := query.NewGetTaskHandler(taskRepository)
 	listTasksHandler := query.NewListTasksHandler(taskRepository)
+	downloadTaskHandler := command.NewDownloadTaskHandler(taskRepository, taskInspectionRepository, httpDownloader)
 
 	// Init Controllers
 	a.Controllers.Task = controller.NewTaskController(jsonResponder, createTaskHandler, getTaskHandler, listTasksHandler)
+
+	// Init Workers
+	a.Workers.DownloadTask = worker.NewDownloadTaskWorker(
+		a.Logger,
+		&a.Config.Workers.Download,
+		taskRepository,
+		downloadTaskHandler,
+	)
 
 	return nil
 }
