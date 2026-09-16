@@ -13,6 +13,7 @@ type Config struct {
 	HTTP     HTTP     `yaml:"http"`
 	Postgres Postgres `yaml:"postgres"`
 	Download Download `yaml:"httpdownload"`
+	Workers  Workers  `yaml:"workers"`
 }
 
 type HTTP struct {
@@ -39,6 +40,14 @@ type Download struct {
 	RangeParts       int      `yaml:"range_parts"`
 }
 
+type Workers struct {
+	Download DownloadWorker `yaml:"download"`
+}
+
+type DownloadWorker struct {
+	Concurrency uint64 `yaml:"concurrency"`
+}
+
 func defaults() Config {
 	return Config{
 		HTTP: HTTP{
@@ -61,6 +70,11 @@ func defaults() Config {
 			PartSize:         ByteSize(5 * humanize.MiByte),   // 5MiB
 			MaxParallelParts: 5,
 			RangeParts:       5,
+		},
+		Workers: Workers{
+			DownloadWorker{
+				Concurrency: 5,
+			},
 		},
 	}
 }
@@ -101,6 +115,10 @@ func (c Config) Validate() error {
 		return err
 	}
 
+	if err := c.Workers.Validate(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -129,6 +147,24 @@ func (c Postgres) Validate() error {
 func (c Download) Validate() error {
 	if c.MinParallelSize.Bytes() <= 0 {
 		return errors.New("httpdownload.min_parallel_size must be greater than 0")
+	}
+
+	return nil
+}
+
+// Validate orchestration and validation of all worker parameters.
+func (c Workers) Validate() error {
+	if err := c.Download.Validate(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Validate validates the download worker parameters.
+func (c DownloadWorker) Validate() error {
+	if c.Concurrency <= 0 {
+		return errors.New("workers.download.concurrency must be greater than 0")
 	}
 
 	return nil
