@@ -22,6 +22,10 @@ type TaskRepository interface {
 	// GetById returns a task by its identifier.
 	GetById(ctx context.Context, id valueobject.ID) (*entity.Task, error)
 
+	// ClaimReadyToDownload atomically claims tasks that are ready for download
+	// and transitions them to the downloading state.
+	ClaimReadyToDownload(ctx context.Context, limit int) ([]*entity.Task, error)
+
 	// Save persists a task entity.
 	Save(ctx context.Context, task *entity.Task) error
 

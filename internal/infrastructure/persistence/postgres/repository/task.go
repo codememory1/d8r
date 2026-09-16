@@ -110,6 +110,57 @@ func (r *TaskRepository) GetById(ctx context.Context, id valueobject.ID) (*entit
 	return model.toDomainEntity()
 }
 
+// ClaimReadyToDownload atomically claims tasks that are ready to be downloaded
+// and transitions them to the downloading state.
+func (r *TaskRepository) ClaimReadyToDownload(ctx context.Context, limit int) ([]*entity.Task, error) {
+	const sql = `
+	WITH pending_tasks AS (
+		SELECT
+			id
+		FROM tasks
+		WHERE status = $1
+		ORDER BY 
+			priority DESC, 
+			id ASC
+		LIMIT $2
+		FOR UPDATE SKIP LOCKED
+	)
+	UPDATE tasks
+	SET status = $3,
+		version = version + 1,
+		updated_at = NOW()
+	FROM pending_tasks
+	WHERE tasks.id = pending_tasks.id
+	RETURNING tasks.*
+	`
+
+	var models []taskModel
+
+	err := pgxscan.Select(ctx, r.connection, &models, sql, []any{
+		entity.TaskStatusReadyToDownload,
+		limit,
+		entity.TaskStatusDownloading,
+	}...)
+
+	if err != nil {
+		return nil, err
+	}
+
+	entities := make([]*entity.Task, len(models))
+
+	for i, model := range models {
+		e, err := model.toDomainEntity()
+
+		if err != nil {
+			return nil, err
+		}
+
+		entities[i] = e
+	}
+
+	return entities, nil
+}
+
 // Save persists a task entity in PostgreSQL.
 func (r *TaskRepository) Save(ctx context.Context, task *entity.Task) error {
 	// Map domain values to their persistence representation.

@@ -26,6 +26,7 @@ func (rt *runtime) newServerCommand() *cobra.Command {
 func (rt *runtime) runServer(cmd *cobra.Command, _ []string) error {
 	return rt.withApp(cmd, func(ctx context.Context, app *bootstrap.App) error {
 		server, serveErr, err := serveHTTP(app)
+		workerErr := runWorkers(ctx, app)
 
 		if err != nil {
 			return err
@@ -33,17 +34,16 @@ func (rt *runtime) runServer(cmd *cobra.Command, _ []string) error {
 
 		select {
 		case <-ctx.Done():
-			shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-
-			if err := server.Shutdown(shutdownCtx); err != nil {
-				return err
-			}
-
-			return nil
+			return shutdownHTTP(server)
 		case err := <-serveErr:
 			if errors.Is(err, http.ErrServerClosed) {
 				return nil
+			}
+
+			return err
+		case err := <-workerErr:
+			if shutdownErr := shutdownHTTP(server); err != nil {
+				return errors.Join(err, shutdownErr)
 			}
 
 			return err
@@ -75,4 +75,31 @@ func serveHTTP(app *bootstrap.App) (*http.Server, <-chan error, error) {
 	}()
 
 	return server, errCh, nil
+}
+
+// runWorkers starts the application's background workers and returns a channel
+// through which their terminal error is reported.
+func runWorkers(ctx context.Context, app *bootstrap.App) <-chan error {
+	errCh := make(chan error, 1)
+
+	go func() {
+		defer close(errCh)
+
+		errCh <- app.Workers.DownloadTask.Run(ctx)
+	}()
+
+	return errCh
+}
+
+// shutdownHTTP gracefully shuts down the HTTP server within the configured timeout.
+func shutdownHTTP(server *http.Server) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+
+	defer cancel()
+
+	if err := server.Shutdown(ctx); err != nil {
+		return err
+	}
+
+	return nil
 }
