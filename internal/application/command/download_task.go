@@ -25,6 +25,19 @@ type DownloadTaskHandler struct {
 	downloader               download.Downloader
 }
 
+// NewDownloadTaskHandler creates a handler for processing download tasks.
+func NewDownloadTaskHandler(
+	taskRepository repository.TaskRepository,
+	taskInspectionRepository repository.TaskInspectionRepository,
+	downloader download.Downloader,
+) *DownloadTaskHandler {
+	return &DownloadTaskHandler{
+		taskRepository:           taskRepository,
+		taskInspectionRepository: taskInspectionRepository,
+		downloader:               downloader,
+	}
+}
+
 // Handle downloads a resource using its latest inspection result.
 func (h *DownloadTaskHandler) Handle(ctx context.Context, cmd DownloadTask) (any, error) {
 	task, err := h.taskRepository.GetById(ctx, cmd.TaskID)
@@ -36,13 +49,6 @@ func (h *DownloadTaskHandler) Handle(ctx context.Context, cmd DownloadTask) (any
 	taskInspection, err := h.taskInspectionRepository.GetLastByTaskID(ctx, cmd.TaskID)
 
 	if err != nil {
-		return nil, err
-	}
-
-	// Persist the downloading state before starting the long-running operation.
-	task.Downloading()
-
-	if err := h.taskRepository.Update(ctx, task); err != nil {
 		return nil, err
 	}
 
