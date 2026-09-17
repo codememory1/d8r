@@ -49,6 +49,7 @@ func (r *TaskInspectionRepository) GetLastByTaskID(ctx context.Context, id value
 		}).
 		OrderBy("created_at DESC").
 		Limit(1).
+		PlaceholderFormat(sq.Dollar).
 		ToSql()
 
 	if err != nil {
