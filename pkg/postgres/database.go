@@ -4,7 +4,6 @@ package postgres
 // and connection lifecycle operations.
 type Database interface {
 	Executor
-	Transaction
 
 	Close()
 }
