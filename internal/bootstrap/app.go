@@ -7,8 +7,10 @@ import (
 
 	"github.com/codememory1/d8r/internal/application/command"
 	"github.com/codememory1/d8r/internal/application/query"
+	"github.com/codememory1/d8r/internal/application/transaction"
 	"github.com/codememory1/d8r/internal/infrastructure/config"
 	"github.com/codememory1/d8r/internal/infrastructure/httpdownload"
+	"github.com/codememory1/d8r/internal/infrastructure/inspect"
 	"github.com/codememory1/d8r/internal/infrastructure/persistence/postgres"
 	"github.com/codememory1/d8r/internal/infrastructure/persistence/postgres/repository"
 	"github.com/codememory1/d8r/internal/infrastructure/storage/filesystem"
@@ -25,6 +27,7 @@ type Controllers struct {
 
 type Workers struct {
 	DownloadTask *worker.DownloadTaskWorker
+	InspectTask  *worker.InspectTaskWorker
 }
 
 // App contains the application's configuration, infrastructure dependencies,
@@ -32,6 +35,7 @@ type Workers struct {
 type App struct {
 	Config         config.Config
 	Pool           *postgres.ConnectionPool
+	Transaction    transaction.Manager
 	Logger         *slog.Logger
 	HandlerAdapter *restful.HandlerAdapter
 	Controllers    Controllers
@@ -47,9 +51,10 @@ func NewApp(ctx context.Context, configuration config.Config, logger *slog.Logge
 	}
 
 	app := &App{
-		Config: configuration,
-		Pool:   postgresPool,
-		Logger: logger,
+		Config:      configuration,
+		Pool:        postgresPool,
+		Transaction: postgresPool,
+		Logger:      logger,
 	}
 
 	if err := app.compose(); err != nil {
@@ -89,10 +94,19 @@ func (a *App) compose() error {
 	// Init Downloader
 	httpDownloader := httpdownload.NewHttpDownloader(&client, fsStorage, &a.Config.Download)
 
+	// Init Inspector
+	httpInspector := inspect.NewHttpInspector(&client, &a.Config.Download, make([]string, 0))
+
 	// Init Query/Command Handlers
 	createTaskHandler := command.NewCreateTaskHandler(taskRepository)
 	getTaskHandler := query.NewGetTaskHandler(taskRepository)
 	listTasksHandler := query.NewListTasksHandler(taskRepository)
+	inspectTaskHandler := command.NewInspectTaskHandler(
+		httpInspector,
+		taskRepository,
+		taskInspectionRepository,
+		a.Transaction,
+	)
 	downloadTaskHandler := command.NewDownloadTaskHandler(taskRepository, taskInspectionRepository, httpDownloader)
 
 	// Init Controllers
@@ -104,6 +118,12 @@ func (a *App) compose() error {
 		&a.Config.Workers.Download,
 		taskRepository,
 		downloadTaskHandler,
+	)
+	a.Workers.InspectTask = worker.NewInspectTaskWorker(
+		a.Logger,
+		&a.Config.Workers.Inspection,
+		taskRepository,
+		inspectTaskHandler,
 	)
 
 	return nil

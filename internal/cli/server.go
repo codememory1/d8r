@@ -80,12 +80,14 @@ func serveHTTP(app *bootstrap.App) (*http.Server, <-chan error, error) {
 // runWorkers starts the application's background workers and returns a channel
 // through which their terminal error is reported.
 func runWorkers(ctx context.Context, app *bootstrap.App) <-chan error {
-	errCh := make(chan error, 1)
+	errCh := make(chan error, 2)
 
 	go func() {
-		defer close(errCh)
-
 		errCh <- app.Workers.DownloadTask.Run(ctx)
+	}()
+
+	go func() {
+		errCh <- app.Workers.InspectTask.Run(ctx)
 	}()
 
 	return errCh
