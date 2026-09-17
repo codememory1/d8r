@@ -14,6 +14,27 @@ import (
 	"github.com/georgysavva/scany/v2/pgxscan"
 )
 
+const claimByStatusSQL = `
+	WITH filtered_tasks AS (
+		SELECT
+			id
+		FROM tasks
+		WHERE status = $1
+		ORDER BY 
+			priority DESC, 
+			id ASC
+		LIMIT $2
+		FOR UPDATE SKIP LOCKED
+	)
+	UPDATE tasks
+	SET status = $3,
+		version = version + 1,
+		updated_at = NOW()
+	FROM filtered_tasks
+	WHERE tasks.id = filtered_tasks.id
+	RETURNING tasks.*
+`
+
 // taskModel represents the persistence model of a task stored in PostgreSQL.
 type taskModel struct {
 	ID        string            `db:"id"`
@@ -113,33 +134,42 @@ func (r *TaskRepository) GetById(ctx context.Context, id valueobject.ID) (*entit
 // ClaimReadyToDownload atomically claims tasks that are ready to be downloaded
 // and transitions them to the downloading state.
 func (r *TaskRepository) ClaimReadyToDownload(ctx context.Context, limit int) ([]*entity.Task, error) {
-	const sql = `
-	WITH pending_tasks AS (
-		SELECT
-			id
-		FROM tasks
-		WHERE status = $1
-		ORDER BY 
-			priority DESC, 
-			id ASC
-		LIMIT $2
-		FOR UPDATE SKIP LOCKED
-	)
-	UPDATE tasks
-	SET status = $3,
-		version = version + 1,
-		updated_at = NOW()
-	FROM pending_tasks
-	WHERE tasks.id = pending_tasks.id
-	RETURNING tasks.*
-	`
-
 	var models []taskModel
 
-	err := pgxscan.Select(ctx, r.connection, &models, sql, []any{
+	err := pgxscan.Select(ctx, r.connection, &models, claimByStatusSQL, []any{
 		entity.TaskStatusReadyToDownload,
 		limit,
 		entity.TaskStatusDownloading,
+	}...)
+
+	if err != nil {
+		return nil, err
+	}
+
+	entities := make([]*entity.Task, len(models))
+
+	for i, model := range models {
+		e, err := model.toDomainEntity()
+
+		if err != nil {
+			return nil, err
+		}
+
+		entities[i] = e
+	}
+
+	return entities, nil
+}
+
+// ClaimPending atomically claims pending tasks for inspection
+// and transitions them to the inspecting state.
+func (r *TaskRepository) ClaimPending(ctx context.Context, limit int) ([]*entity.Task, error) {
+	var models []taskModel
+
+	err := pgxscan.Select(ctx, r.connection, &models, claimByStatusSQL, []any{
+		entity.TaskStatusPending,
+		limit,
+		entity.TaskStatusInspecting,
 	}...)
 
 	if err != nil {
