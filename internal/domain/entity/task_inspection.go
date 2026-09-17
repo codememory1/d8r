@@ -106,5 +106,5 @@ func (t *TaskInspection) LastModifiedAt() *time.Time {
 }
 
 func (t *TaskInspection) CreatedAt() time.Time {
-	return t.CreatedAt()
+	return t.createdAt
 }
