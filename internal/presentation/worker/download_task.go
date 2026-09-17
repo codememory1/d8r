@@ -90,22 +90,24 @@ func (w *DownloadTaskWorker) processTask(ctx context.Context, task *entity.Task)
 		return ctx.Err()
 	}
 
-	w.logger.ErrorContext(
-		ctx,
-		"download task processing failed",
-		slog.String("task_id", task.ID().String()),
-		slog.Any("error", err),
-	)
-
-	task.Fail()
-
-	if updateErr := w.taskRepository.Update(ctx, task); updateErr != nil {
+	if err != nil {
 		w.logger.ErrorContext(
 			ctx,
-			"Failed to transition the task to the 'failed' status.",
+			"download task processing failed",
 			slog.String("task_id", task.ID().String()),
-			slog.Any("error", updateErr),
+			slog.Any("error", err),
 		)
+
+		task.Fail()
+
+		if updateErr := w.taskRepository.Update(ctx, task); updateErr != nil {
+			w.logger.ErrorContext(
+				ctx,
+				"Failed to transition the task to the 'failed' status.",
+				slog.String("task_id", task.ID().String()),
+				slog.Any("error", updateErr),
+			)
+		}
 	}
 
 	// A task-specific failure must not stop the worker.

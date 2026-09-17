@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/codememory1/d8r/internal/application/inspect"
+	"github.com/codememory1/d8r/internal/application/transaction"
 	"github.com/codememory1/d8r/internal/domain/entity"
 	"github.com/codememory1/d8r/internal/domain/repository"
 	"github.com/codememory1/d8r/internal/domain/valueobject"
@@ -11,36 +12,39 @@ import (
 )
 
 // Compile-time check that InspectResourceHandler implements the required command handler.
-var _ cqrs.CommandHandler[InspectResource, valueobject.ID] = (*InspectResourceHandler)(nil)
+var _ cqrs.CommandHandler[InspectTask, valueobject.ID] = (*InspectTaskHandler)(nil)
 
-// InspectResource requests an inspection of the resource associated with a http download task.
-type InspectResource struct {
+// InspectTask requests an inspection of the resource associated with a http download task.
+type InspectTask struct {
 	TaskID valueobject.ID
 }
 
-// InspectResourceHandler coordinates resource inspection and persists its result.
-type InspectResourceHandler struct {
+// InspectTaskHandler coordinates resource inspection and persists its result.
+type InspectTaskHandler struct {
 	inspector                inspect.Inspector
 	taskRepository           repository.TaskRepository
 	taskInspectionRepository repository.TaskInspectionRepository
+	transactionManager       transaction.Manager
 }
 
-// NewInspectResourceHandler creates a handler for the InspectResource command.
-func NewInspectResourceHandler(
+// NewInspectTaskHandler creates a handler for the InspectResource command.
+func NewInspectTaskHandler(
 	inspector inspect.Inspector,
 	taskRepository repository.TaskRepository,
 	taskInspectionRepository repository.TaskInspectionRepository,
-) *InspectResourceHandler {
-	return &InspectResourceHandler{
+	transactionManager transaction.Manager,
+) *InspectTaskHandler {
+	return &InspectTaskHandler{
 		inspector:                inspector,
 		taskRepository:           taskRepository,
 		taskInspectionRepository: taskInspectionRepository,
+		transactionManager:       transactionManager,
 	}
 }
 
 // Handle inspects the task resource, stores the resulting inspection,
 // and returns the identifier of the created inspection.
-func (h *InspectResourceHandler) Handle(ctx context.Context, cmd InspectResource) (valueobject.ID, error) {
+func (h *InspectTaskHandler) Handle(ctx context.Context, cmd InspectTask) (valueobject.ID, error) {
 	// Load the task to obtain the original resource URL and related settings.
 	task, err := h.taskRepository.GetById(ctx, cmd.TaskID)
 
@@ -49,7 +53,7 @@ func (h *InspectResourceHandler) Handle(ctx context.Context, cmd InspectResource
 	}
 
 	// Inspect the remote resource and determine its http download metadata and strategy.
-	result, err := h.inspector.Inspect(ctx, task.URL().String())
+	result, err := h.inspector.Inspect(ctx, task.URL().String(), task.Headers().Map())
 
 	if err != nil {
 		return valueobject.ID{}, err
@@ -67,8 +71,22 @@ func (h *InspectResourceHandler) Handle(ctx context.Context, cmd InspectResource
 		result.LastModified,
 	)
 
-	// Persist the inspection so it can be reused without repeated HTTP requests.
-	if err := h.taskInspectionRepository.Save(ctx, taskInspection); err != nil {
+	task.ReadyToDownload()
+
+	err = h.transactionManager.Run(ctx, func(ctx context.Context) error {
+		if updateErr := h.taskRepository.Update(ctx, task); updateErr != nil {
+			return updateErr
+		}
+
+		// Persist the inspection so it can be reused without repeated HTTP requests.
+		if err := h.taskInspectionRepository.Save(ctx, taskInspection); err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
 		return valueobject.ID{}, err
 	}
 

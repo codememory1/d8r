@@ -41,10 +41,15 @@ type Download struct {
 }
 
 type Workers struct {
-	Download DownloadWorker `yaml:"download"`
+	Download   DownloadWorker   `yaml:"download"`
+	Inspection InspectionWorker `yaml:"inspection"`
 }
 
 type DownloadWorker struct {
+	Concurrency uint64 `yaml:"concurrency"`
+}
+
+type InspectionWorker struct {
 	Concurrency uint64 `yaml:"concurrency"`
 }
 
@@ -73,6 +78,9 @@ func defaults() Config {
 		},
 		Workers: Workers{
 			DownloadWorker{
+				Concurrency: 5,
+			},
+			InspectionWorker{
 				Concurrency: 5,
 			},
 		},
@@ -158,6 +166,10 @@ func (c Workers) Validate() error {
 		return err
 	}
 
+	if err := c.Inspection.Validate(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -165,6 +177,15 @@ func (c Workers) Validate() error {
 func (c DownloadWorker) Validate() error {
 	if c.Concurrency <= 0 {
 		return errors.New("workers.download.concurrency must be greater than 0")
+	}
+
+	return nil
+}
+
+// Validate validates the inspection worker parameters.
+func (c InspectionWorker) Validate() error {
+	if c.Concurrency <= 0 {
+		return errors.New("workers.inspection.concurrency must be greater than 0")
 	}
 
 	return nil

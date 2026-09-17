@@ -26,6 +26,10 @@ type TaskRepository interface {
 	// and transitions them to the downloading state.
 	ClaimReadyToDownload(ctx context.Context, limit int) ([]*entity.Task, error)
 
+	// ClaimPending atomically claims pending tasks for inspection
+	// and transitions them to the inspecting state.
+	ClaimPending(ctx context.Context, limit int) ([]*entity.Task, error)
+
 	// Save persists a task entity.
 	Save(ctx context.Context, task *entity.Task) error
 
