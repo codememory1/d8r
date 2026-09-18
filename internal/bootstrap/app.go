@@ -22,7 +22,8 @@ import (
 
 // Controllers contains the application's HTTP controllers.
 type Controllers struct {
-	Task *controller.TaskController
+	Task    *controller.TaskController
+	Webhook *controller.WebhookController
 }
 
 type Workers struct {
@@ -84,6 +85,7 @@ func (a *App) compose() error {
 	// Init Repositories
 	taskRepository := repository.NewTaskRepository(a.Pool)
 	taskInspectionRepository := repository.NewTaskInspectionRepository(a.Pool)
+	webhookRepository := repository.NewWebhookRepository(a.Pool)
 
 	// Init clients
 	client := http.Client{}
@@ -108,9 +110,11 @@ func (a *App) compose() error {
 		a.Transaction,
 	)
 	downloadTaskHandler := command.NewDownloadTaskHandler(taskRepository, taskInspectionRepository, httpDownloader)
+	createWebhookHandler := command.NewCreateWebhookHandler(webhookRepository)
 
 	// Init Controllers
 	a.Controllers.Task = controller.NewTaskController(jsonResponder, createTaskHandler, getTaskHandler, listTasksHandler)
+	a.Controllers.Webhook = controller.NewWebhookController(jsonResponder, createWebhookHandler)
 
 	// Init Workers
 	a.Workers.DownloadTask = worker.NewDownloadTaskWorker(
