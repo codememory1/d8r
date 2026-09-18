@@ -60,7 +60,7 @@ func (c *TaskController) Create(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	return c.responder.Respond(w, http.StatusCreated, respond.NewSuccessBody(map[string]any{
-		"id": id,
+		"id": id.String(),
 	}))
 }
 
