@@ -10,10 +10,11 @@ import (
 )
 
 type Config struct {
-	HTTP     HTTP     `yaml:"http"`
-	Postgres Postgres `yaml:"postgres"`
-	Download Download `yaml:"httpdownload"`
-	Workers  Workers  `yaml:"workers"`
+	HTTP     HTTP          `yaml:"http"`
+	Postgres Postgres      `yaml:"postgres"`
+	Download Download      `yaml:"httpdownload"`
+	Workers  Workers       `yaml:"workers"`
+	Webhook  WebhookConfig `yaml:"webhook"`
 }
 
 type HTTP struct {
@@ -53,6 +54,13 @@ type InspectionWorker struct {
 	Concurrency uint64 `yaml:"concurrency"`
 }
 
+type WebhookConfig struct {
+	Concurrency    uint64        `yaml:"concurrency"`
+	RequestTimeout time.Duration `yaml:"request_timeout"`
+	MaxAttempts    uint64        `yaml:"max_attempts"`
+	RetryDelay     time.Duration `yaml:"retry_delay"`
+}
+
 func defaults() Config {
 	return Config{
 		HTTP: HTTP{
@@ -83,6 +91,12 @@ func defaults() Config {
 			InspectionWorker{
 				Concurrency: 5,
 			},
+		},
+		Webhook: WebhookConfig{
+			Concurrency:    10,
+			RequestTimeout: 10 * time.Second,
+			MaxAttempts:    5,
+			RetryDelay:     5 * time.Second,
 		},
 	}
 }
@@ -124,6 +138,10 @@ func (c Config) Validate() error {
 	}
 
 	if err := c.Workers.Validate(); err != nil {
+		return err
+	}
+
+	if err := c.Webhook.Validate(); err != nil {
 		return err
 	}
 
@@ -186,6 +204,15 @@ func (c DownloadWorker) Validate() error {
 func (c InspectionWorker) Validate() error {
 	if c.Concurrency <= 0 {
 		return errors.New("workers.inspection.concurrency must be greater than 0")
+	}
+
+	return nil
+}
+
+// Validate webhook parameter validation
+func (c WebhookConfig) Validate() error {
+	if c.Concurrency <= 0 {
+		return errors.New("webhook.concurrency must be greater than 0")
 	}
 
 	return nil
