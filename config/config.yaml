@@ -48,3 +48,26 @@ download:
 
   # Number of byte ranges into which a resource is divided.
   range_parts: 5
+
+workers:
+  download:
+    # Maximum number of download tasks processed concurrently.
+    concurrency: 5
+
+  inspection:
+    # Maximum number of task inspections processed concurrently.
+    concurrency: 5
+
+webhook:
+  # Maximum number of webhook deliveries processed concurrently.
+  concurrency: 10
+
+  # Maximum duration allowed for a single webhook HTTP request.
+  request_timeout: "10s"
+
+  # Maximum number of delivery attempts before marking a webhook as failed.
+  max_attempts: 5
+
+  # Initial delay before retrying a failed webhook delivery.
+  # The actual delay may increase with each subsequent attempt.
+  retry_delay: "5s"

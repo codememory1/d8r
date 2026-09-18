@@ -14,5 +14,7 @@ func (a *App) Router() http.Handler {
 	r.Get("/tasks/{id}", a.HandlerAdapter.Wrap(a.Controllers.Task.Get))
 	r.Get("/tasks", a.HandlerAdapter.Wrap(a.Controllers.Task.List))
 
+	r.Post("/webhooks", a.HandlerAdapter.Wrap(a.Controllers.Webhook.Create))
+
 	return r
 }
