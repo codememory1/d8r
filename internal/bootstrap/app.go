@@ -9,6 +9,8 @@ import (
 	"github.com/codememory1/d8r/internal/application/query"
 	"github.com/codememory1/d8r/internal/application/transaction"
 	"github.com/codememory1/d8r/internal/infrastructure/config"
+	"github.com/codememory1/d8r/internal/infrastructure/eventbus"
+	"github.com/codememory1/d8r/internal/infrastructure/eventcodec"
 	"github.com/codememory1/d8r/internal/infrastructure/httpdownload"
 	"github.com/codememory1/d8r/internal/infrastructure/inspect"
 	"github.com/codememory1/d8r/internal/infrastructure/persistence/postgres"
@@ -29,6 +31,7 @@ type Controllers struct {
 type Workers struct {
 	DownloadTask *worker.DownloadTaskWorker
 	InspectTask  *worker.InspectTaskWorker
+	OutboxEvent  *worker.OutboxEventWorker
 }
 
 // App contains the application's configuration, infrastructure dependencies,
@@ -86,6 +89,7 @@ func (a *App) compose() error {
 	taskRepository := repository.NewTaskRepository(a.Pool)
 	taskInspectionRepository := repository.NewTaskInspectionRepository(a.Pool)
 	webhookRepository := repository.NewWebhookRepository(a.Pool)
+	outboxEventRepository := repository.NewOutboxEventRepository(a.Pool)
 
 	// Init clients
 	client := http.Client{}
@@ -98,6 +102,12 @@ func (a *App) compose() error {
 
 	// Init Inspector
 	httpInspector := inspect.NewHttpInspector(&client, &a.Config.Download, make([]string, 0))
+
+	// Init Event Dispatcher
+	eventDispatcher := eventbus.NewDispatcher()
+
+	// Init Event Decoder
+	eventDecoder := eventcodec.NewDecoder()
 
 	// Init Query/Command Handlers
 	createTaskHandler := command.NewCreateTaskHandler(taskRepository)
@@ -128,6 +138,12 @@ func (a *App) compose() error {
 		&a.Config.Workers.Inspection,
 		taskRepository,
 		inspectTaskHandler,
+	)
+	a.Workers.OutboxEvent = worker.NewOutboxEventWorker(
+		a.Logger,
+		eventDecoder,
+		eventDispatcher,
+		outboxEventRepository,
 	)
 
 	return nil

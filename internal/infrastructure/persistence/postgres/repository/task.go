@@ -14,7 +14,7 @@ import (
 	"github.com/georgysavva/scany/v2/pgxscan"
 )
 
-const claimByStatusSQL = `
+const taskClaimByStatusSQL = `
 	WITH filtered_tasks AS (
 		SELECT
 			id
@@ -136,7 +136,7 @@ func (r *TaskRepository) GetById(ctx context.Context, id valueobject.ID) (*entit
 func (r *TaskRepository) ClaimReadyToDownload(ctx context.Context, limit int) ([]*entity.Task, error) {
 	var models []taskModel
 
-	err := pgxscan.Select(ctx, r.connection, &models, claimByStatusSQL, []any{
+	err := pgxscan.Select(ctx, r.connection, &models, taskClaimByStatusSQL, []any{
 		entity.TaskStatusReadyToDownload,
 		limit,
 		entity.TaskStatusDownloading,
@@ -166,7 +166,7 @@ func (r *TaskRepository) ClaimReadyToDownload(ctx context.Context, limit int) ([
 func (r *TaskRepository) ClaimPending(ctx context.Context, limit int) ([]*entity.Task, error) {
 	var models []taskModel
 
-	err := pgxscan.Select(ctx, r.connection, &models, claimByStatusSQL, []any{
+	err := pgxscan.Select(ctx, r.connection, &models, taskClaimByStatusSQL, []any{
 		entity.TaskStatusPending,
 		limit,
 		entity.TaskStatusInspecting,
