@@ -6,4 +6,4 @@ ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 migrate \
   -path "$ROOT_DIR/migrations" \
   -database "$DATABASE_DSN" \
-  $1
+  "$@"
