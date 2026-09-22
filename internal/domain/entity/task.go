@@ -5,10 +5,31 @@ import (
 
 	"github.com/codememory1/d8r/internal/domain/valueobject"
 	"github.com/codememory1/d8r/pkg/ddd"
+	"github.com/codememory1/d8r/pkg/statemachine"
 )
+
+// TaskTransition represents a named task state transition.
+type TaskTransition string
 
 // TaskStatus represents the current lifecycle state of a task.
 type TaskStatus string
+
+const (
+	// TaskTransitionInspect starts task inspection.
+	TaskTransitionInspect TaskTransition = "inspect"
+
+	// TaskTransitionReady marks the task as ready for download.
+	TaskTransitionReady TaskTransition = "ready"
+
+	// TaskTransitionDownload starts task downloading.
+	TaskTransitionDownload TaskTransition = "download"
+
+	// TaskTransitionComplete completes the task.
+	TaskTransitionComplete TaskTransition = "complete"
+
+	// TaskTransitionFail marks the task as failed.
+	TaskTransitionFail TaskTransition = "fail"
+)
 
 const (
 	// TaskStatusPending indicates that the task is waiting to be inspected.
@@ -28,6 +49,46 @@ const (
 
 	// TaskStatusFailed indicates that the task has failed during processing.
 	TaskStatusFailed TaskStatus = "failed"
+)
+
+// taskStateMachine defines allowed task status transitions.
+var taskStateMachine = statemachine.NewMachine(
+	statemachine.T(
+		TaskTransitionInspect,
+		[]TaskStatus{
+			TaskStatusPending,
+		},
+		TaskStatusInspecting,
+	),
+	statemachine.T(
+		TaskTransitionReady,
+		[]TaskStatus{
+			TaskStatusInspecting,
+		},
+		TaskStatusReadyToDownload,
+	),
+	statemachine.T(
+		TaskTransitionDownload,
+		[]TaskStatus{
+			TaskStatusReadyToDownload,
+		},
+		TaskStatusDownloading,
+	),
+	statemachine.T(
+		TaskTransitionComplete,
+		[]TaskStatus{
+			TaskStatusDownloading,
+		},
+		TaskStatusCompleted,
+	),
+	statemachine.T(
+		TaskTransitionFail,
+		[]TaskStatus{
+			TaskStatusInspecting,
+			TaskStatusDownloading,
+		},
+		TaskStatusFailed,
+	),
 )
 
 var _ ddd.Entity[valueobject.ID] = (*Task)(nil)
@@ -130,27 +191,41 @@ func (t *Task) UpdatedAt() *time.Time {
 	return t.updatedAt
 }
 
-// Inspecting transitions the task to the inspecting state.
-func (t *Task) Inspecting() {
-	t.status = TaskStatusInspecting
+// Inspect transitions the task to the inspecting state.
+func (t *Task) Inspect() error {
+	return t.transition(TaskTransitionInspect)
 }
 
-// ReadyToDownload marks the task as successfully inspected and ready for download.
-func (t *Task) ReadyToDownload() {
-	t.status = TaskStatusReadyToDownload
+// Ready transitions the task to the ready-to-download state.
+func (t *Task) Ready() error {
+	return t.transition(TaskTransitionReady)
 }
 
-// Downloading marks the task as currently being downloaded.
-func (t *Task) Downloading() {
-	t.status = TaskStatusDownloading
+// Download transitions the task to the downloading state.
+func (t *Task) Download() error {
+	return t.transition(TaskTransitionDownload)
 }
 
-// Complete marks the task as successfully completed.
-func (t *Task) Complete() {
-	t.status = TaskStatusCompleted
+// Complete transitions the task to the completed state.
+func (t *Task) Complete() error {
+	return t.transition(TaskTransitionComplete)
 }
 
-// Fail marks the task as failed.
-func (t *Task) Fail() {
-	t.status = TaskStatusFailed
+// Fail transitions the task to the failed state.
+func (t *Task) Fail() error {
+	return t.transition(TaskTransitionFail)
+}
+
+// transition applies the named state transition to the task.
+func (t *Task) transition(name TaskTransition) error {
+	newStatus, err := taskStateMachine.Transition(name, t.status)
+
+	if err != nil {
+		return err
+	}
+
+	t.status = newStatus
+	t.updatedAt = new(time.Now())
+
+	return nil
 }

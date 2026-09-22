@@ -6,7 +6,6 @@ import (
 
 	"github.com/codememory1/d8r/internal/domain/entity"
 	"github.com/codememory1/d8r/internal/domain/valueobject"
-	"github.com/codememory1/d8r/pkg/pagination"
 )
 
 var (
@@ -16,19 +15,8 @@ var (
 
 // TaskRepository defines persistence operations for task entities.
 type TaskRepository interface {
-	// GetAllPaginated returns tasks using cursor-based pagination.
-	GetAllPaginated(ctx context.Context, cursor *pagination.Cursor, limit int) ([]*entity.Task, error)
-
-	// GetById returns a task by its identifier.
-	GetById(ctx context.Context, id valueobject.ID) (*entity.Task, error)
-
-	// ClaimReadyToDownload atomically claims tasks that are ready for download
-	// and transitions them to the downloading state.
-	ClaimReadyToDownload(ctx context.Context, limit int) ([]*entity.Task, error)
-
-	// ClaimPending atomically claims pending tasks for inspection
-	// and transitions them to the inspecting state.
-	ClaimPending(ctx context.Context, limit int) ([]*entity.Task, error)
+	// GetByID returns a task by its identifier.
+	GetByID(ctx context.Context, id valueobject.ID) (*entity.Task, error)
 
 	// Save persists a task entity.
 	Save(ctx context.Context, task *entity.Task) error

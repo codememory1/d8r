@@ -5,10 +5,22 @@ import (
 	"time"
 
 	"github.com/codememory1/d8r/internal/domain/valueobject"
+	"github.com/codememory1/d8r/pkg/statemachine"
 )
+
+// WebhookTransition represents a named webhook state transition.
+type WebhookTransition string
 
 // WebhookStatus represents the operational state of a webhook.
 type WebhookStatus string
+
+const (
+	// WebhookTransitionEnable enable webhook.
+	WebhookTransitionEnable WebhookTransition = "enable"
+
+	// WebhookTransitionDisable disable webhook.
+	WebhookTransitionDisable WebhookTransition = "disable"
+)
 
 const (
 	// WebhookStatusEnabled indicates that the webhook can receive events.
@@ -16,6 +28,24 @@ const (
 
 	// WebhookStatusDisabled indicates that event delivery is disabled.
 	WebhookStatusDisabled WebhookStatus = "disabled"
+)
+
+// webhookStateMachine defines allowed webhook status transitions.
+var webhookStateMachine = statemachine.NewMachine(
+	statemachine.T(
+		WebhookTransitionEnable,
+		[]WebhookStatus{
+			WebhookStatusDisabled,
+		},
+		WebhookStatusEnabled,
+	),
+	statemachine.T(
+		WebhookTransitionDisable,
+		[]WebhookStatus{
+			WebhookStatusEnabled,
+		},
+		WebhookStatusDisabled,
+	),
 )
 
 var (
@@ -148,11 +178,25 @@ func (w *Webhook) Supports(eventType valueobject.WebhookEventType) bool {
 }
 
 // Enable enables event delivery to the webhook.
-func (w *Webhook) Enable() {
-	w.status = WebhookStatusEnabled
+func (w *Webhook) Enable() error {
+	return w.transition(WebhookTransitionEnable)
 }
 
 // Disable disables event delivery to the webhook.
-func (w *Webhook) Disable() {
-	w.status = WebhookStatusDisabled
+func (w *Webhook) Disable() error {
+	return w.transition(WebhookTransitionDisable)
+}
+
+// transition applies the named state transition to the webhook.
+func (w *Webhook) transition(name WebhookTransition) error {
+	newStatus, err := webhookStateMachine.Transition(name, w.status)
+
+	if err != nil {
+		return err
+	}
+
+	w.status = newStatus
+	w.updatedAt = new(time.Now())
+
+	return nil
 }
