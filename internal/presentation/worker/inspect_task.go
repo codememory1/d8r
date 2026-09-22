@@ -18,6 +18,7 @@ import (
 type InspectTaskWorker struct {
 	logger             *slog.Logger
 	config             *config.InspectionWorker
+	taskClaimer        command.TaskClaimer
 	taskRepository     repository.TaskRepository
 	inspectTaskHandler cqrs.CommandHandler[command.InspectTask, valueobject.ID]
 }
@@ -26,12 +27,14 @@ type InspectTaskWorker struct {
 func NewInspectTaskWorker(
 	logger *slog.Logger,
 	config *config.InspectionWorker,
+	taskClaimer command.TaskClaimer,
 	taskRepository repository.TaskRepository,
 	inspectTaskHandler cqrs.CommandHandler[command.InspectTask, valueobject.ID],
 ) *InspectTaskWorker {
 	return &InspectTaskWorker{
 		logger:             logger,
 		config:             config,
+		taskClaimer:        taskClaimer,
 		taskRepository:     taskRepository,
 		inspectTaskHandler: inspectTaskHandler,
 	}
@@ -41,7 +44,7 @@ func NewInspectTaskWorker(
 // canceled or an unrecoverable error occurs.
 func (w *InspectTaskWorker) Run(ctx context.Context) error {
 	for {
-		tasks, err := w.taskRepository.ClaimPending(ctx, int(w.config.Concurrency))
+		tasks, err := w.taskClaimer.ClaimPending(ctx, int(w.config.Concurrency))
 
 		if err != nil {
 			return err

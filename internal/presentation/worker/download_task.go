@@ -17,6 +17,7 @@ import (
 type DownloadTaskWorker struct {
 	logger              *slog.Logger
 	config              *config.DownloadWorker
+	taskClaimer         command.TaskClaimer
 	taskRepository      repository.TaskRepository
 	downloadTaskHandler cqrs.CommandHandler[command.DownloadTask, any]
 }
@@ -24,12 +25,14 @@ type DownloadTaskWorker struct {
 func NewDownloadTaskWorker(
 	logger *slog.Logger,
 	config *config.DownloadWorker,
+	taskClaimer command.TaskClaimer,
 	taskRepository repository.TaskRepository,
 	downloadTaskHandler cqrs.CommandHandler[command.DownloadTask, any],
 ) *DownloadTaskWorker {
 	return &DownloadTaskWorker{
 		logger:              logger,
 		config:              config,
+		taskClaimer:         taskClaimer,
 		taskRepository:      taskRepository,
 		downloadTaskHandler: downloadTaskHandler,
 	}
@@ -43,7 +46,7 @@ func (w *DownloadTaskWorker) Run(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
-			tasks, err := w.taskRepository.ClaimReadyToDownload(ctx, int(w.config.Concurrency))
+			tasks, err := w.taskClaimer.ClaimReadyToDownload(ctx, int(w.config.Concurrency))
 
 			if err != nil {
 				return err
