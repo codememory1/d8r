@@ -40,7 +40,7 @@ func NewDownloadTaskHandler(
 
 // Handle downloads a resource using its latest inspection result.
 func (h *DownloadTaskHandler) Handle(ctx context.Context, cmd DownloadTask) (any, error) {
-	task, err := h.taskRepository.GetById(ctx, cmd.TaskID)
+	task, err := h.taskRepository.GetByID(ctx, cmd.TaskID)
 
 	if err != nil {
 		return nil, err
@@ -68,7 +68,8 @@ func (h *DownloadTaskHandler) Handle(ctx context.Context, cmd DownloadTask) (any
 
 	if downloadErr := h.downloader.Download(ctx, options); downloadErr != nil {
 		// Persist the failed state while preserving the original download error.
-		task.Fail()
+		if failTransitionErr := task.Fail(); failTransitionErr != nil {
+		}
 
 		if updateErr := h.taskRepository.Update(ctx, task); updateErr != nil {
 			return nil, errors.Join(downloadErr, updateErr)

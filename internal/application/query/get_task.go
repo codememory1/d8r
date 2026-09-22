@@ -3,10 +3,8 @@ package query
 import (
 	"context"
 
-	"github.com/codememory1/d8r/internal/domain/repository"
 	"github.com/codememory1/d8r/internal/domain/valueobject"
 	"github.com/codememory1/d8r/pkg/cqrs"
-	"github.com/codememory1/d8r/pkg/optional"
 	"github.com/codememory1/d8r/pkg/timeutil"
 )
 
@@ -32,31 +30,31 @@ type GetTaskResult struct {
 
 // GetTaskHandler handles queries for retrieving a task by its identifier.
 type GetTaskHandler struct {
-	taskRepository repository.TaskRepository
+	taskReader TaskReader
 }
 
 // NewGetTaskHandler creates a handler for task retrieval queries.
-func NewGetTaskHandler(taskRepository repository.TaskRepository) *GetTaskHandler {
+func NewGetTaskHandler(taskReader TaskReader) *GetTaskHandler {
 	return &GetTaskHandler{
-		taskRepository: taskRepository,
+		taskReader: taskReader,
 	}
 }
 
 // Handle retrieves a task and converts it into a query result.
-func (h *GetTaskHandler) Handle(ctx context.Context, query GetTask) (GetTaskResult, error) {
-	task, err := h.taskRepository.GetById(ctx, query.ID)
+func (h *GetTaskHandler) Handle(ctx context.Context, q GetTask) (GetTaskResult, error) {
+	task, err := h.taskReader.GetByID(ctx, q.ID)
 
 	if err != nil {
 		return GetTaskResult{}, err
 	}
 
 	return GetTaskResult{
-		ID:        task.ID().String(),
-		URL:       task.URL().String(),
-		Headers:   task.Headers().Map(),
-		Filename:  optional.Map(task.Filename(), valueobject.Filename.String),
-		Status:    string(task.Status()),
-		CreatedAt: task.CreatedAt().Unix(),
-		UpdatedAt: timeutil.UnixTimestamp(task.UpdatedAt()),
+		ID:        task.ID,
+		URL:       task.URL,
+		Headers:   task.Headers,
+		Filename:  task.Filename,
+		Status:    task.Status,
+		CreatedAt: task.CreatedAt.Unix(),
+		UpdatedAt: timeutil.UnixTimestamp(task.UpdatedAt),
 	}, nil
 }

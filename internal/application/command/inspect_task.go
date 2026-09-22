@@ -2,6 +2,7 @@ package command
 
 import (
 	"context"
+	"errors"
 
 	"github.com/codememory1/d8r/internal/application/inspect"
 	"github.com/codememory1/d8r/internal/application/transaction"
@@ -46,16 +47,32 @@ func NewInspectTaskHandler(
 // and returns the identifier of the created inspection.
 func (h *InspectTaskHandler) Handle(ctx context.Context, cmd InspectTask) (valueobject.ID, error) {
 	// Load the task to obtain the original resource URL and related settings.
-	task, err := h.taskRepository.GetById(ctx, cmd.TaskID)
+	task, err := h.taskRepository.GetByID(ctx, cmd.TaskID)
 
 	if err != nil {
 		return valueobject.ID{}, err
 	}
 
 	// Inspect the remote resource and determine its http download metadata and strategy.
-	result, err := h.inspector.Inspect(ctx, task.URL().String(), task.Headers().Map())
+	result, inspectErr := h.inspector.Inspect(ctx, task.URL().String(), task.Headers().Map())
 
-	if err != nil {
+	if inspectErr != nil {
+		// Do not mark the task as failed when the application is shutting down.
+		if ctx.Err() != nil {
+			return valueobject.ID{}, ctx.Err()
+		}
+
+		if failTransitionErr := task.Fail(); failTransitionErr != nil {
+			return valueobject.ID{}, errors.Join(inspectErr, failTransitionErr)
+		}
+
+		if updateErr := h.taskRepository.Update(ctx, task); updateErr != nil {
+			return valueobject.ID{}, errors.Join(
+				inspectErr,
+				updateErr,
+			)
+		}
+
 		return valueobject.ID{}, err
 	}
 
@@ -71,7 +88,9 @@ func (h *InspectTaskHandler) Handle(ctx context.Context, cmd InspectTask) (value
 		result.LastModified,
 	)
 
-	task.ReadyToDownload()
+	if readyTransitionErr := task.Ready(); readyTransitionErr != nil {
+		return valueobject.ID{}, readyTransitionErr
+	}
 
 	err = h.transactionManager.Run(ctx, func(ctx context.Context) error {
 		if updateErr := h.taskRepository.Update(ctx, task); updateErr != nil {
