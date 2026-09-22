@@ -67,8 +67,12 @@ func (h *DownloadTaskHandler) Handle(ctx context.Context, cmd DownloadTask) (any
 	}
 
 	if downloadErr := h.downloader.Download(ctx, options); downloadErr != nil {
-		// Persist the failed state while preserving the original download error.
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+
 		if failTransitionErr := task.Fail(); failTransitionErr != nil {
+			return nil, errors.Join(downloadErr, failTransitionErr)
 		}
 
 		if updateErr := h.taskRepository.Update(ctx, task); updateErr != nil {
@@ -78,8 +82,9 @@ func (h *DownloadTaskHandler) Handle(ctx context.Context, cmd DownloadTask) (any
 		return nil, err
 	}
 
-	// Mark the task as completed only after the entire file has been downloaded.
-	task.Complete()
+	if completeTransitionErr := task.Complete(); completeTransitionErr != nil {
+		return nil, completeTransitionErr
+	}
 
 	if err := h.taskRepository.Update(ctx, task); err != nil {
 		return nil, err

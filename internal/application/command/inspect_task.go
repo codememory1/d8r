@@ -73,7 +73,7 @@ func (h *InspectTaskHandler) Handle(ctx context.Context, cmd InspectTask) (value
 			)
 		}
 
-		return valueobject.ID{}, err
+		return valueobject.ID{}, inspectErr
 	}
 
 	// Convert the application-level inspection result into a domain entity.
