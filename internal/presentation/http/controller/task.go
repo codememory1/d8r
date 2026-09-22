@@ -6,7 +6,6 @@ import (
 
 	"github.com/codememory1/d8r/internal/application/command"
 	"github.com/codememory1/d8r/internal/application/query"
-	"github.com/codememory1/d8r/internal/domain/repository"
 	"github.com/codememory1/d8r/internal/domain/valueobject"
 	"github.com/codememory1/d8r/internal/presentation/http/request"
 	"github.com/codememory1/d8r/pkg/cqrs"
@@ -78,7 +77,7 @@ func (c *TaskController) Get(w http.ResponseWriter, r *http.Request) error {
 	})
 
 	if err != nil {
-		if errors.Is(err, repository.ErrTaskNotFound) {
+		if errors.Is(err, query.ErrTaskNotFound) {
 			return restful.NewError(http.StatusNotFound, "task not found", err)
 		}
 

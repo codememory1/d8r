@@ -2,15 +2,16 @@ package reader
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/codememory1/d8r/internal/application/query"
-	"github.com/codememory1/d8r/internal/domain/repository"
 	"github.com/codememory1/d8r/internal/domain/valueobject"
 	"github.com/codememory1/d8r/internal/infrastructure/persistence/postgres"
 	"github.com/codememory1/d8r/pkg/pagination"
 	"github.com/georgysavva/scany/v2/pgxscan"
+	"github.com/jackc/pgx/v5"
 )
 
 var _ query.TaskReader = (*TaskReader)(nil)
@@ -94,9 +95,14 @@ func (r *TaskReader) GetByID(ctx context.Context, id valueobject.ID) (query.Task
 
 	var row taskRow
 
-	// Load the persistence model matching the requested identifier.
-	if pgxscan.Get(ctx, r.connection, &row, sql, args...) != nil {
-		return query.TaskReadModel{}, repository.ErrNotFound
+	err = pgxscan.Get(ctx, r.connection, &row, sql, args...)
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		return query.TaskReadModel{}, query.ErrTaskNotFound
+	}
+
+	if err != nil {
+		return query.TaskReadModel{}, err
 	}
 
 	return row.toReadModel(), nil

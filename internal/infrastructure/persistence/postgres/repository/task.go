@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
@@ -11,6 +12,7 @@ import (
 	"github.com/codememory1/d8r/internal/infrastructure/persistence/postgres"
 	"github.com/codememory1/d8r/pkg/optional"
 	"github.com/georgysavva/scany/v2/pgxscan"
+	"github.com/jackc/pgx/v5"
 )
 
 const taskClaimByStatusSQL = `
@@ -74,9 +76,14 @@ func (r *TaskRepository) GetByID(ctx context.Context, id valueobject.ID) (*entit
 
 	var model taskModel
 
-	// Load the persistence model matching the requested identifier.
-	if pgxscan.Get(ctx, r.connection, &model, sql, args...) != nil {
-		return nil, repository.ErrNotFound
+	err = pgxscan.Get(ctx, r.connection, &model, sql, args...)
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, repository.ErrTaskNotFound
+	}
+
+	if err != nil {
+		return nil, err
 	}
 
 	return model.toDomainEntity()
