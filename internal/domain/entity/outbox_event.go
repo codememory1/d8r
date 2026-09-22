@@ -2,6 +2,8 @@ package entity
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/codememory1/d8r/internal/domain/valueobject"
@@ -23,6 +25,10 @@ const (
 
 	// OutboxEventStatusFailed indicates that the event processing failed.
 	OutboxEventStatusFailed OutboxEventStatus = "failed"
+)
+
+var (
+	ErrInvalidOutboxEventStatus = errors.New("invalid outbox event status")
 )
 
 // OutboxEvent represents a domain event persisted for asynchronous processing.
@@ -53,21 +59,26 @@ func UnmarshalOutboxEvent(
 	id valueobject.ID,
 	eventType ddd.EventType,
 	payload json.RawMessage,
-	status OutboxEventStatus,
+	status string,
 	version int64,
 	createdAt time.Time,
 	updatedAt *time.Time,
-) *OutboxEvent {
+) (*OutboxEvent, error) {
+	outboxEventStatus, err := ParseOutboxEventStatus(status)
+
+	if err != nil {
+		return nil, err
+	}
+
 	return &OutboxEvent{
 		AggregateVersion: ddd.NewAggregateVersion(version),
-
-		id:        id,
-		eventType: eventType,
-		payload:   payload,
-		status:    status,
-		createdAt: createdAt,
-		updatedAt: updatedAt,
-	}
+		id:               id,
+		eventType:        eventType,
+		payload:          payload,
+		status:           outboxEventStatus,
+		createdAt:        createdAt,
+		updatedAt:        updatedAt,
+	}, nil
 }
 
 // ID returns the unique identifier of the outbox event.
@@ -113,4 +124,20 @@ func (e *OutboxEvent) Processed() {
 // Failed marks the outbox event as failed.
 func (e *OutboxEvent) Failed() {
 	e.status = OutboxEventStatusFailed
+}
+
+func ParseOutboxEventStatus(
+	value string,
+) (OutboxEventStatus, error) {
+	status := OutboxEventStatus(value)
+
+	switch status {
+	case OutboxEventStatusPending,
+		OutboxEventStatusProcessing,
+		OutboxEventStatusProcessed,
+		OutboxEventStatusFailed:
+		return status, nil
+	default:
+		return "", fmt.Errorf("%w: %q", ErrInvalidOutboxEventStatus, value)
+	}
 }

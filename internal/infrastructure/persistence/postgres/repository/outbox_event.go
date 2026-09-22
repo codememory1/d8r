@@ -159,9 +159,9 @@ func (m outboxEventModel) toDomainEntity() (*entity.OutboxEvent, error) {
 		id,
 		ddd.EventType(m.EventType),
 		m.Payload,
-		entity.OutboxEventStatus(m.Status),
+		m.Status,
 		m.Version,
 		m.CreatedAt,
 		m.UpdatedAt,
-	), nil
+	)
 }

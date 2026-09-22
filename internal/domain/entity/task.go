@@ -1,6 +1,8 @@
 package entity
 
 import (
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/codememory1/d8r/internal/domain/valueobject"
@@ -91,6 +93,10 @@ var taskStateMachine = statemachine.NewMachine(
 	),
 )
 
+var (
+	ErrInvalidTaskStatus = errors.New("invalid task status")
+)
+
 var _ ddd.Entity[valueobject.ID] = (*Task)(nil)
 
 // Task represents a downloadable resource and its current lifecycle state.
@@ -136,19 +142,24 @@ func UnmarshalTask(
 	version int64,
 	createdAt time.Time,
 	updatedAt *time.Time,
-) *Task {
+) (*Task, error) {
+	taskStatus, err := ParseTaskStatus(status)
+
+	if err != nil {
+		return nil, err
+	}
+
 	return &Task{
 		AggregateVersion: ddd.NewAggregateVersion(version),
-
-		id:        id,
-		url:       url,
-		headers:   headers,
-		filename:  filename,
-		priority:  priority,
-		status:    TaskStatus(status),
-		createdAt: createdAt,
-		updatedAt: updatedAt,
-	}
+		id:               id,
+		url:              url,
+		headers:          headers,
+		filename:         filename,
+		priority:         priority,
+		status:           taskStatus,
+		createdAt:        createdAt,
+		updatedAt:        updatedAt,
+	}, nil
 }
 
 // ID returns the unique identifier of the task.
@@ -228,4 +239,20 @@ func (t *Task) transition(name TaskTransition) error {
 	t.updatedAt = new(time.Now())
 
 	return nil
+}
+
+func ParseTaskStatus(value string) (TaskStatus, error) {
+	status := TaskStatus(value)
+
+	switch status {
+	case TaskStatusPending,
+		TaskStatusInspecting,
+		TaskStatusReadyToDownload,
+		TaskStatusDownloading,
+		TaskStatusCompleted,
+		TaskStatusFailed:
+		return status, nil
+	default:
+		return "", fmt.Errorf("%w: %q", ErrInvalidTaskStatus, value)
+	}
 }

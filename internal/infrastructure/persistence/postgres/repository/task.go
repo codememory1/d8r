@@ -270,5 +270,5 @@ func (m taskModel) toDomainEntity() (*entity.Task, error) {
 		m.Version,
 		m.CreatedAt,
 		m.UpdatedAt,
-	), nil
+	)
 }

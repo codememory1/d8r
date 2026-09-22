@@ -2,6 +2,7 @@ package entity
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/codememory1/d8r/internal/domain/valueobject"
@@ -56,6 +57,8 @@ var (
 	// ErrWebhookUnsubscribed is returned when the requested subscription
 	// does not exist.
 	ErrWebhookUnsubscribed = errors.New("webhook subscription not found")
+
+	ErrInvalidWebhookStatus = errors.New("invalid webhook status")
 )
 
 // Webhook is an aggregate root that represents an HTTP endpoint and its
@@ -99,18 +102,26 @@ func UnmarshalWebhook(
 	id valueobject.ID,
 	url valueobject.URL,
 	headers valueobject.Headers,
-	status WebhookStatus,
+	status string,
+	subscriptions map[valueobject.WebhookEventType]WebhookSubscription,
 	createdAt time.Time,
 	updatedAt *time.Time,
-) *Webhook {
-	return &Webhook{
-		id:        id,
-		url:       url,
-		headers:   headers,
-		status:    status,
-		createdAt: createdAt,
-		updatedAt: updatedAt,
+) (*Webhook, error) {
+	webhookStatus, err := ParseWebhookStatus(status)
+
+	if err != nil {
+		return nil, err
 	}
+
+	return &Webhook{
+		id:            id,
+		url:           url,
+		headers:       headers,
+		status:        webhookStatus,
+		subscriptions: subscriptions,
+		createdAt:     createdAt,
+		updatedAt:     updatedAt,
+	}, nil
 }
 
 // ID returns the webhook identifier.
@@ -199,4 +210,16 @@ func (w *Webhook) transition(name WebhookTransition) error {
 	w.updatedAt = new(time.Now())
 
 	return nil
+}
+
+func ParseWebhookStatus(value string) (WebhookStatus, error) {
+	status := WebhookStatus(value)
+
+	switch status {
+	case WebhookStatusEnabled,
+		WebhookStatusDisabled:
+		return status, nil
+	default:
+		return "", fmt.Errorf("%w: %q", ErrInvalidWebhookStatus, value)
+	}
 }
