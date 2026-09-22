@@ -14,6 +14,7 @@ import (
 	"github.com/codememory1/d8r/internal/infrastructure/httpdownload"
 	"github.com/codememory1/d8r/internal/infrastructure/inspect"
 	"github.com/codememory1/d8r/internal/infrastructure/persistence/postgres"
+	"github.com/codememory1/d8r/internal/infrastructure/persistence/postgres/reader"
 	"github.com/codememory1/d8r/internal/infrastructure/persistence/postgres/repository"
 	"github.com/codememory1/d8r/internal/infrastructure/storage/filesystem"
 	"github.com/codememory1/d8r/internal/presentation/http/controller"
@@ -91,6 +92,9 @@ func (a *App) compose() error {
 	webhookRepository := repository.NewWebhookRepository(a.Pool)
 	outboxEventRepository := repository.NewOutboxEventRepository(a.Pool)
 
+	// Init Readers
+	taskReader := reader.NewTaskReader(a.Pool)
+	
 	// Init clients
 	client := http.Client{}
 
@@ -111,8 +115,8 @@ func (a *App) compose() error {
 
 	// Init Query/Command Handlers
 	createTaskHandler := command.NewCreateTaskHandler(taskRepository)
-	getTaskHandler := query.NewGetTaskHandler(taskRepository)
-	listTasksHandler := query.NewListTasksHandler(taskRepository)
+	getTaskHandler := query.NewGetTaskHandler(taskReader)
+	listTasksHandler := query.NewListTasksHandler(taskReader)
 	inspectTaskHandler := command.NewInspectTaskHandler(
 		httpInspector,
 		taskRepository,
