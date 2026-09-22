@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/codememory1/d8r/internal/application/command"
-	"github.com/codememory1/d8r/internal/domain/entity"
+	"github.com/codememory1/d8r/internal/domain/valueobject"
 	"github.com/codememory1/d8r/internal/infrastructure/config"
 	"github.com/codememory1/d8r/pkg/cqrs"
 	"golang.org/x/sync/errgroup"
@@ -42,13 +42,13 @@ func (w *DownloadTaskWorker) Run(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
-			tasks, err := w.taskClaimer.ClaimReadyToDownload(ctx, int(w.config.Concurrency))
+			taskIDs, err := w.taskClaimer.ClaimReadyToDownload(ctx, int(w.config.Concurrency))
 
 			if err != nil {
 				return err
 			}
 
-			if len(tasks) == 0 {
+			if len(taskIDs) == 0 {
 				if err := w.wait(ctx); err != nil {
 					return err
 				}
@@ -56,7 +56,7 @@ func (w *DownloadTaskWorker) Run(ctx context.Context) error {
 				continue
 			}
 
-			if err := w.processTasks(ctx, tasks); err != nil {
+			if err := w.processTasks(ctx, taskIDs); err != nil {
 				return err
 			}
 		}
@@ -64,14 +64,14 @@ func (w *DownloadTaskWorker) Run(ctx context.Context) error {
 }
 
 // processTasks concurrently processes a claimed batch of download tasks.
-func (w *DownloadTaskWorker) processTasks(ctx context.Context, tasks []*entity.Task) error {
+func (w *DownloadTaskWorker) processTasks(ctx context.Context, taskIDs []valueobject.ID) error {
 	var group errgroup.Group
 
 	group.SetLimit(int(w.config.Concurrency))
 
-	for _, task := range tasks {
+	for _, taskID := range taskIDs {
 		group.Go(func() error {
-			return w.processTask(ctx, task)
+			return w.processTask(ctx, taskID)
 		})
 	}
 
@@ -79,9 +79,9 @@ func (w *DownloadTaskWorker) processTasks(ctx context.Context, tasks []*entity.T
 }
 
 // processTask processes a single download task and logs task-specific failures.
-func (w *DownloadTaskWorker) processTask(ctx context.Context, task *entity.Task) error {
+func (w *DownloadTaskWorker) processTask(ctx context.Context, taskID valueobject.ID) error {
 	_, err := w.downloadTaskHandler.Handle(ctx, command.DownloadTask{
-		TaskID: task.ID(),
+		TaskID: taskID,
 	})
 
 	// Context cancellation must stop the entire worker.
@@ -93,7 +93,7 @@ func (w *DownloadTaskWorker) processTask(ctx context.Context, task *entity.Task)
 		w.logger.ErrorContext(
 			ctx,
 			"download task processing failed",
-			slog.String("task_id", task.ID().String()),
+			slog.String("task_id", taskID.String()),
 			slog.Any("error", err),
 		)
 	}

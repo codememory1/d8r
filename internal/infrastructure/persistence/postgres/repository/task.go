@@ -31,7 +31,7 @@ const taskClaimByStatusSQL = `
 		updated_at = NOW()
 	FROM filtered_tasks
 	WHERE tasks.id = filtered_tasks.id
-	RETURNING tasks.*
+	RETURNING tasks.id
 `
 
 // taskModel represents the persistence model of a task stored in PostgreSQL.
@@ -84,7 +84,7 @@ func (r *TaskRepository) GetByID(ctx context.Context, id valueobject.ID) (*entit
 
 // ClaimReadyToDownload atomically claims tasks that are ready to be downloaded
 // and transitions them to the downloading state.
-func (r *TaskRepository) ClaimReadyToDownload(ctx context.Context, limit int) ([]*entity.Task, error) {
+func (r *TaskRepository) ClaimReadyToDownload(ctx context.Context, limit int) ([]valueobject.ID, error) {
 	var models []taskModel
 
 	err := pgxscan.Select(ctx, r.connection, &models, taskClaimByStatusSQL, []any{
@@ -97,24 +97,24 @@ func (r *TaskRepository) ClaimReadyToDownload(ctx context.Context, limit int) ([
 		return nil, err
 	}
 
-	entities := make([]*entity.Task, len(models))
+	ids := make([]valueobject.ID, len(models))
 
 	for i, model := range models {
-		e, err := model.toDomainEntity()
+		id, err := valueobject.ParseID(model.ID)
 
 		if err != nil {
 			return nil, err
 		}
 
-		entities[i] = e
+		ids[i] = id
 	}
 
-	return entities, nil
+	return ids, nil
 }
 
 // ClaimPending atomically claims pending tasks for inspection
 // and transitions them to the inspecting state.
-func (r *TaskRepository) ClaimPending(ctx context.Context, limit int) ([]*entity.Task, error) {
+func (r *TaskRepository) ClaimPending(ctx context.Context, limit int) ([]valueobject.ID, error) {
 	var models []taskModel
 
 	err := pgxscan.Select(ctx, r.connection, &models, taskClaimByStatusSQL, []any{
@@ -127,19 +127,19 @@ func (r *TaskRepository) ClaimPending(ctx context.Context, limit int) ([]*entity
 		return nil, err
 	}
 
-	entities := make([]*entity.Task, len(models))
+	ids := make([]valueobject.ID, len(models))
 
 	for i, model := range models {
-		e, err := model.toDomainEntity()
+		id, err := valueobject.ParseID(model.ID)
 
 		if err != nil {
 			return nil, err
 		}
 
-		entities[i] = e
+		ids[i] = id
 	}
 
-	return entities, nil
+	return ids, nil
 }
 
 // Save persists a task entity in PostgreSQL.

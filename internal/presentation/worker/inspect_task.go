@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/codememory1/d8r/internal/application/command"
-	"github.com/codememory1/d8r/internal/domain/entity"
 	"github.com/codememory1/d8r/internal/domain/valueobject"
 	"github.com/codememory1/d8r/internal/infrastructure/config"
 	"github.com/codememory1/d8r/pkg/cqrs"
@@ -40,19 +39,19 @@ func NewInspectTaskWorker(
 // canceled or an unrecoverable error occurs.
 func (w *InspectTaskWorker) Run(ctx context.Context) error {
 	for {
-		tasks, err := w.taskClaimer.ClaimPending(ctx, int(w.config.Concurrency))
+		taskIDs, err := w.taskClaimer.ClaimPending(ctx, int(w.config.Concurrency))
 
 		if err != nil {
 			return err
 		}
 
-		if len(tasks) == 0 {
+		if len(taskIDs) == 0 {
 			if err := w.wait(ctx); err != nil {
 				return err
 			}
 		}
 
-		if err := w.processTasks(ctx, tasks); err != nil {
+		if err := w.processTasks(ctx, taskIDs); err != nil {
 			return err
 		}
 	}
@@ -60,14 +59,14 @@ func (w *InspectTaskWorker) Run(ctx context.Context) error {
 
 // processTasks processes the claimed tasks concurrently up to the configured
 // concurrency limit.
-func (w *InspectTaskWorker) processTasks(ctx context.Context, tasks []*entity.Task) error {
+func (w *InspectTaskWorker) processTasks(ctx context.Context, taskIDs []valueobject.ID) error {
 	var group errgroup.Group
 
 	group.SetLimit(int(w.config.Concurrency))
 
-	for _, task := range tasks {
+	for _, taskID := range taskIDs {
 		group.Go(func() error {
-			return w.processTask(ctx, task)
+			return w.processTask(ctx, taskID)
 		})
 	}
 
@@ -76,9 +75,9 @@ func (w *InspectTaskWorker) processTasks(ctx context.Context, tasks []*entity.Ta
 
 // processTask inspects a task and transitions it to the failed state when the
 // inspection cannot be completed.
-func (w *InspectTaskWorker) processTask(ctx context.Context, task *entity.Task) error {
+func (w *InspectTaskWorker) processTask(ctx context.Context, taskID valueobject.ID) error {
 	_, err := w.inspectTaskHandler.Handle(ctx, command.InspectTask{
-		TaskID: task.ID(),
+		TaskID: taskID,
 	})
 
 	if ctx.Err() != nil {
@@ -89,7 +88,7 @@ func (w *InspectTaskWorker) processTask(ctx context.Context, task *entity.Task) 
 		w.logger.ErrorContext(
 			ctx,
 			"failed to inspect task",
-			slog.String("task_id", task.ID().String()),
+			slog.String("task_id", taskID.String()),
 			slog.Any("error", err),
 		)
 	}
