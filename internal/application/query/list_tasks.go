@@ -26,8 +26,8 @@ type ListTasks struct {
 
 // ListTasksResult represents a paginated list of tasks.
 type ListTasksResult struct {
-	Items      []TaskListItem `json:"items"`
-	NextCursor *string        `json:"next_cursor"`
+	Items      []TaskListItem
+	NextCursor *pagination.Cursor
 }
 
 // TaskListItem represents a task returned as part of the task list query.
@@ -91,16 +91,11 @@ func (h *ListTasksHandler) Handle(ctx context.Context, q ListTasks) (ListTasksRe
 	// Build the next cursor, if available, and include it in the result.
 	if hasNext {
 		lastTask := tasks[len(tasks)-1]
-		nextCursor, err := pagination.EncodeCursor(pagination.Cursor{
+
+		result.NextCursor = &pagination.Cursor{
 			LastID:    lastTask.ID,
 			Timestamp: lastTask.CreatedAt.UnixMicro(),
-		})
-
-		if err != nil {
-			return ListTasksResult{}, err
 		}
-
-		result.NextCursor = &nextCursor
 	}
 
 	return result, nil

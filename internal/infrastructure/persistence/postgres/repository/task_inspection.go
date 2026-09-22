@@ -69,7 +69,7 @@ func (r *TaskInspectionRepository) GetLastByTaskID(ctx context.Context, id value
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return model.toDomainEntity()
 }
 

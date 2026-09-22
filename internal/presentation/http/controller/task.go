@@ -9,6 +9,7 @@ import (
 	"github.com/codememory1/d8r/internal/domain/valueobject"
 	"github.com/codememory1/d8r/internal/presentation/http/request"
 	"github.com/codememory1/d8r/pkg/cqrs"
+	"github.com/codememory1/d8r/pkg/pagination"
 	"github.com/codememory1/d8r/pkg/restful"
 	"github.com/codememory1/d8r/pkg/restful/respond"
 	"github.com/go-chi/chi/v5"
@@ -107,9 +108,21 @@ func (c *TaskController) List(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
+	var nextCursor *string
+
+	if result.NextCursor != nil {
+		encodedCursor, err := pagination.EncodeCursor(*result.NextCursor)
+
+		if err != nil {
+			return err
+		}
+
+		nextCursor = &encodedCursor
+	}
+
 	responseBody := respond.
 		NewSuccessBody(result.Items).
-		WithCursorPagination(q.Limit, result.NextCursor)
+		WithCursorPagination(q.Limit, nextCursor)
 
 	return c.responder.Respond(w, http.StatusOK, responseBody)
 }
