@@ -7,7 +7,6 @@ import (
 
 	"github.com/codememory1/d8r/internal/application/command"
 	"github.com/codememory1/d8r/internal/domain/entity"
-	"github.com/codememory1/d8r/internal/domain/repository"
 	"github.com/codememory1/d8r/internal/domain/valueobject"
 	"github.com/codememory1/d8r/internal/infrastructure/config"
 	"github.com/codememory1/d8r/pkg/cqrs"
@@ -19,7 +18,6 @@ type InspectTaskWorker struct {
 	logger             *slog.Logger
 	config             *config.InspectionWorker
 	taskClaimer        command.TaskClaimer
-	taskRepository     repository.TaskRepository
 	inspectTaskHandler cqrs.CommandHandler[command.InspectTask, valueobject.ID]
 }
 
@@ -28,14 +26,12 @@ func NewInspectTaskWorker(
 	logger *slog.Logger,
 	config *config.InspectionWorker,
 	taskClaimer command.TaskClaimer,
-	taskRepository repository.TaskRepository,
 	inspectTaskHandler cqrs.CommandHandler[command.InspectTask, valueobject.ID],
 ) *InspectTaskWorker {
 	return &InspectTaskWorker{
 		logger:             logger,
 		config:             config,
 		taskClaimer:        taskClaimer,
-		taskRepository:     taskRepository,
 		inspectTaskHandler: inspectTaskHandler,
 	}
 }
@@ -92,21 +88,10 @@ func (w *InspectTaskWorker) processTask(ctx context.Context, task *entity.Task) 
 	if err != nil {
 		w.logger.ErrorContext(
 			ctx,
-			"Failed to inspect task",
+			"failed to inspect task",
 			slog.String("task_id", task.ID().String()),
 			slog.Any("error", err),
 		)
-
-		task.Fail()
-
-		if updateErr := w.taskRepository.Update(ctx, task); updateErr != nil {
-			w.logger.ErrorContext(
-				ctx,
-				"Failed to transition the task to the 'failed' status.",
-				slog.String("task_id", task.ID().String()),
-				slog.Any("error", err),
-			)
-		}
 	}
 
 	return nil

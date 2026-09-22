@@ -7,7 +7,6 @@ import (
 
 	"github.com/codememory1/d8r/internal/application/command"
 	"github.com/codememory1/d8r/internal/domain/entity"
-	"github.com/codememory1/d8r/internal/domain/repository"
 	"github.com/codememory1/d8r/internal/infrastructure/config"
 	"github.com/codememory1/d8r/pkg/cqrs"
 	"golang.org/x/sync/errgroup"
@@ -18,7 +17,6 @@ type DownloadTaskWorker struct {
 	logger              *slog.Logger
 	config              *config.DownloadWorker
 	taskClaimer         command.TaskClaimer
-	taskRepository      repository.TaskRepository
 	downloadTaskHandler cqrs.CommandHandler[command.DownloadTask, any]
 }
 
@@ -26,14 +24,12 @@ func NewDownloadTaskWorker(
 	logger *slog.Logger,
 	config *config.DownloadWorker,
 	taskClaimer command.TaskClaimer,
-	taskRepository repository.TaskRepository,
 	downloadTaskHandler cqrs.CommandHandler[command.DownloadTask, any],
 ) *DownloadTaskWorker {
 	return &DownloadTaskWorker{
 		logger:              logger,
 		config:              config,
 		taskClaimer:         taskClaimer,
-		taskRepository:      taskRepository,
 		downloadTaskHandler: downloadTaskHandler,
 	}
 }
@@ -100,17 +96,6 @@ func (w *DownloadTaskWorker) processTask(ctx context.Context, task *entity.Task)
 			slog.String("task_id", task.ID().String()),
 			slog.Any("error", err),
 		)
-
-		task.Fail()
-
-		if updateErr := w.taskRepository.Update(ctx, task); updateErr != nil {
-			w.logger.ErrorContext(
-				ctx,
-				"Failed to transition the task to the 'failed' status.",
-				slog.String("task_id", task.ID().String()),
-				slog.Any("error", updateErr),
-			)
-		}
 	}
 
 	// A task-specific failure must not stop the worker.
