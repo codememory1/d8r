@@ -10,7 +10,6 @@ import (
 	"github.com/codememory1/d8r/internal/domain/valueobject"
 	"github.com/codememory1/d8r/internal/infrastructure/persistence/postgres"
 	"github.com/codememory1/d8r/pkg/optional"
-	"github.com/codememory1/d8r/pkg/pagination"
 	"github.com/georgysavva/scany/v2/pgxscan"
 )
 
@@ -58,56 +57,8 @@ func NewTaskRepository(pool *postgres.ConnectionPool) *TaskRepository {
 	return &TaskRepository{connection: pool}
 }
 
-// GetAllPaginated returns tasks using cursor-based keyset pagination.
-func (r *TaskRepository) GetAllPaginated(ctx context.Context, cursor *pagination.Cursor, limit int) ([]*entity.Task, error) {
-	// Build a deterministic ordering that matches the cursor fields.
-	builder := sq.
-		Select("*").
-		From("tasks").
-		Limit(uint64(limit)).
-		OrderBy("created_at DESC", "id DESC").
-		PlaceholderFormat(sq.Dollar)
-
-	// Continue from the item represented by the cursor when provided.
-	if cursor != nil {
-		builder = builder.Where(sq.Expr(
-			"(created_at, id) < (?, ?)",
-			time.UnixMicro(cursor.Timestamp),
-			cursor.LastID,
-		))
-	}
-
-	sql, args, err := builder.ToSql()
-
-	if err != nil {
-		return nil, err
-	}
-
-	var models []taskModel
-
-	// Load persistence models from PostgreSQL.
-	if err := pgxscan.Select(ctx, r.connection, &models, sql, args...); err != nil {
-		return nil, err
-	}
-
-	// Rehydrate domain entities from persistence models.
-	entities := make([]*entity.Task, len(models))
-
-	for i, model := range models {
-		e, err := model.toDomainEntity()
-
-		if err != nil {
-			return nil, err
-		}
-
-		entities[i] = e
-	}
-
-	return entities, nil
-}
-
-// GetById returns a task by its identifier.
-func (r *TaskRepository) GetById(ctx context.Context, id valueobject.ID) (*entity.Task, error) {
+// GetByID returns a task by its identifier.
+func (r *TaskRepository) GetByID(ctx context.Context, id valueobject.ID) (*entity.Task, error) {
 	sql, args, err := sq.
 		Select("*").
 		From("tasks").
