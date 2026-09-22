@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/codememory1/d8r/internal/application/command"
+	"github.com/codememory1/d8r/internal/application/download"
 	"github.com/codememory1/d8r/internal/application/query"
 	"github.com/codememory1/d8r/internal/application/transaction"
 	"github.com/codememory1/d8r/internal/infrastructure/config"
@@ -94,7 +95,7 @@ func (a *App) compose() error {
 
 	// Init Readers
 	taskReader := reader.NewTaskReader(a.Pool)
-	
+
 	// Init clients
 	client := http.Client{}
 
@@ -113,12 +114,18 @@ func (a *App) compose() error {
 	// Init Event Decoder
 	eventDecoder := eventcodec.NewDecoder()
 
+	// Init strategy selector
+	strategySelector := download.NewStrategySelector(
+		a.Config.Download.MinParallelSize.Bytes(),
+	)
+
 	// Init Query/Command Handlers
 	createTaskHandler := command.NewCreateTaskHandler(taskRepository)
 	getTaskHandler := query.NewGetTaskHandler(taskReader)
 	listTasksHandler := query.NewListTasksHandler(taskReader)
 	inspectTaskHandler := command.NewInspectTaskHandler(
 		httpInspector,
+		strategySelector,
 		taskRepository,
 		taskInspectionRepository,
 		a.Transaction,

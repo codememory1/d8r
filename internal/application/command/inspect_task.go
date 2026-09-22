@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/codememory1/d8r/internal/application/download"
 	"github.com/codememory1/d8r/internal/application/inspect"
 	"github.com/codememory1/d8r/internal/application/transaction"
 	"github.com/codememory1/d8r/internal/domain/entity"
@@ -23,6 +24,7 @@ type InspectTask struct {
 // InspectTaskHandler coordinates resource inspection and persists its result.
 type InspectTaskHandler struct {
 	inspector                inspect.Inspector
+	strategySelector         *download.StrategySelector
 	taskRepository           repository.TaskRepository
 	taskInspectionRepository repository.TaskInspectionRepository
 	transactionManager       transaction.Manager
@@ -31,12 +33,14 @@ type InspectTaskHandler struct {
 // NewInspectTaskHandler creates a handler for the InspectResource command.
 func NewInspectTaskHandler(
 	inspector inspect.Inspector,
+	strategySelector *download.StrategySelector,
 	taskRepository repository.TaskRepository,
 	taskInspectionRepository repository.TaskInspectionRepository,
 	transactionManager transaction.Manager,
 ) *InspectTaskHandler {
 	return &InspectTaskHandler{
 		inspector:                inspector,
+		strategySelector:         strategySelector,
 		taskRepository:           taskRepository,
 		taskInspectionRepository: taskInspectionRepository,
 		transactionManager:       transactionManager,
@@ -76,6 +80,8 @@ func (h *InspectTaskHandler) Handle(ctx context.Context, cmd InspectTask) (value
 		return valueobject.ID{}, inspectErr
 	}
 
+	strategy := h.strategySelector.Select(result.Size, result.SupportsParallelDownload)
+
 	// Convert the application-level inspection result into a domain entity.
 	taskInspection := entity.NewTaskInspection(
 		cmd.TaskID,
@@ -83,7 +89,7 @@ func (h *InspectTaskHandler) Handle(ctx context.Context, cmd InspectTask) (value
 		result.ContentType,
 		result.Filename,
 		result.Size,
-		result.DownloadStrategy,
+		strategy,
 		result.ETag,
 		result.LastModified,
 	)

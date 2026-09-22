@@ -230,3 +230,14 @@ func resolveRangeSupport(probeRangeResponse *http.Response) valueobject.RangeSup
 		return valueobject.RangeSupportUnknown
 	}
 }
+
+func resolveSupportsParallel(
+	rangeSupport valueobject.RangeSupport,
+	contentEncoding *string,
+) bool {
+	if rangeSupport == valueobject.RangeSupportSupported {
+		return contentEncoding == nil || *contentEncoding == "" || strings.EqualFold(*contentEncoding, "identity")
+	}
+
+	return false
+}
