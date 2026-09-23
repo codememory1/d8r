@@ -33,7 +33,7 @@ func (d *Decoder) Register(eventType ddd.EventType, factory Factory) {
 }
 
 // Decode deserializes a payload into the event registered for the specified type.
-func (d *Decoder) Decode(eventType ddd.EventType, payload []byte) (*ddd.Event, error) {
+func (d *Decoder) Decode(eventType ddd.EventType, payload []byte) (ddd.Event, error) {
 	factory, ok := d.factories[eventType]
 
 	if !ok {
@@ -46,5 +46,5 @@ func (d *Decoder) Decode(eventType ddd.EventType, payload []byte) (*ddd.Event, e
 		return nil, err
 	}
 
-	return &event, nil
+	return event, nil
 }

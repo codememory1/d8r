@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	domainevent "github.com/codememory1/d8r/internal/domain/event"
 	"github.com/codememory1/d8r/internal/domain/valueobject"
 	"github.com/codememory1/d8r/pkg/ddd"
 	"github.com/codememory1/d8r/pkg/statemachine"
@@ -101,6 +102,7 @@ var _ ddd.Entity[valueobject.ID] = (*Task)(nil)
 
 // Task represents a downloadable resource and its current lifecycle state.
 type Task struct {
+	ddd.AggregateRoot
 	ddd.AggregateVersion
 
 	id        valueobject.ID
@@ -120,7 +122,7 @@ func NewTask(
 	filename *valueobject.Filename,
 	priority valueobject.Priority,
 ) *Task {
-	return &Task{
+	task := &Task{
 		id:        valueobject.NewID(),
 		url:       url,
 		headers:   headers,
@@ -129,6 +131,10 @@ func NewTask(
 		status:    TaskStatusPending,
 		createdAt: time.Now(),
 	}
+
+	task.Raise(domainevent.NewTaskCreated(task.id, task.createdAt))
+
+	return task
 }
 
 // UnmarshalTask restores a task from its persisted state.

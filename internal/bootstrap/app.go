@@ -14,7 +14,9 @@ import (
 	"github.com/codememory1/d8r/internal/infrastructure/eventcodec"
 	"github.com/codememory1/d8r/internal/infrastructure/httpdownload"
 	"github.com/codememory1/d8r/internal/infrastructure/inspect"
+	infraoutbox "github.com/codememory1/d8r/internal/infrastructure/outbox"
 	"github.com/codememory1/d8r/internal/infrastructure/persistence/postgres"
+	"github.com/codememory1/d8r/internal/infrastructure/persistence/postgres/outbox"
 	"github.com/codememory1/d8r/internal/infrastructure/persistence/postgres/reader"
 	"github.com/codememory1/d8r/internal/infrastructure/persistence/postgres/repository"
 	"github.com/codememory1/d8r/internal/infrastructure/storage/filesystem"
@@ -91,7 +93,6 @@ func (a *App) compose() error {
 	taskRepository := repository.NewTaskRepository(a.Pool)
 	taskInspectionRepository := repository.NewTaskInspectionRepository(a.Pool)
 	webhookRepository := repository.NewWebhookRepository(a.Pool)
-	outboxEventRepository := repository.NewOutboxEventRepository(a.Pool)
 
 	// Init Readers
 	taskReader := reader.NewTaskReader(a.Pool)
@@ -114,13 +115,20 @@ func (a *App) compose() error {
 	// Init Event Decoder
 	eventDecoder := eventcodec.NewDecoder()
 
+	// Event Publisher
+	eventPublisher := outbox.NewPublisher(a.Pool)
+
+	// Outbox
+	outboxStore := outbox.NewStore(a.Pool)
+	outboxRelay := infraoutbox.NewRelay(outboxStore, eventDecoder, eventDispatcher, 10)
+
 	// Init strategy selector
 	strategySelector := download.NewStrategySelector(
 		a.Config.Download.MinParallelSize.Bytes(),
 	)
 
 	// Init Query/Command Handlers
-	createTaskHandler := command.NewCreateTaskHandler(taskRepository)
+	createTaskHandler := command.NewCreateTaskHandler(a.Pool, eventPublisher, taskRepository)
 	getTaskHandler := query.NewGetTaskHandler(taskReader)
 	listTasksHandler := query.NewListTasksHandler(taskReader)
 	inspectTaskHandler := command.NewInspectTaskHandler(
@@ -150,12 +158,7 @@ func (a *App) compose() error {
 		taskRepository,
 		inspectTaskHandler,
 	)
-	a.Workers.OutboxEvent = worker.NewOutboxEventWorker(
-		a.Logger,
-		eventDecoder,
-		eventDispatcher,
-		outboxEventRepository,
-	)
+	a.Workers.OutboxEvent = worker.NewOutboxEventWorker(a.Pool, a.Logger, outboxRelay)
 
 	return nil
 }
