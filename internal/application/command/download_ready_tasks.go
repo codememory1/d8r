@@ -3,11 +3,16 @@ package command
 import (
 	"context"
 
+	"github.com/codememory1/d8r/internal/domain/valueobject"
 	"github.com/codememory1/d8r/pkg/cqrs"
 	"golang.org/x/sync/errgroup"
 )
 
 var _ cqrs.CommandHandler[DownloadReadyTasks, struct{}] = (*DownloadReadyTasksHandler)(nil)
+
+type ReadyToDownloadTaskClaimer interface {
+	ClaimReadyToDownload(ctx context.Context, limit int) ([]valueobject.ID, error)
+}
 
 type DownloadReadyTasks struct {
 	Concurrency int
@@ -15,12 +20,12 @@ type DownloadReadyTasks struct {
 }
 
 type DownloadReadyTasksHandler struct {
-	taskClaimer         TaskClaimer
+	taskClaimer         ReadyToDownloadTaskClaimer
 	downloadTaskHandler cqrs.CommandHandler[DownloadTask, struct{}]
 }
 
 func NewDownloadReadyTasksHandler(
-	taskClaimer TaskClaimer,
+	taskClaimer ReadyToDownloadTaskClaimer,
 	downloadTaskHandler cqrs.CommandHandler[DownloadTask, struct{}],
 ) *DownloadReadyTasksHandler {
 	return &DownloadReadyTasksHandler{

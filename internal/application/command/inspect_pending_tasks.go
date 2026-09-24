@@ -10,18 +10,22 @@ import (
 
 var _ cqrs.CommandHandler[InspectPendingTasks, struct{}] = (*InspectPendingTasksHandler)(nil)
 
+type PendingTaskClaimer interface {
+	ClaimPending(ctx context.Context, limit int) ([]valueobject.ID, error)
+}
+
 type InspectPendingTasks struct {
 	Concurrency int
 	Limit       int
 }
 
 type InspectPendingTasksHandler struct {
-	taskClaimer        TaskClaimer
+	taskClaimer        PendingTaskClaimer
 	inspectTaskHandler cqrs.CommandHandler[InspectTask, valueobject.ID]
 }
 
 func NewInspectPendingTasksHandler(
-	taskClaimer TaskClaimer,
+	taskClaimer PendingTaskClaimer,
 	inspectTaskHandler cqrs.CommandHandler[InspectTask, valueobject.ID],
 ) *InspectPendingTasksHandler {
 	return &InspectPendingTasksHandler{
