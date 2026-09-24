@@ -11,7 +11,7 @@ import (
 	"github.com/codememory1/d8r/pkg/cqrs"
 )
 
-var _ cqrs.CommandHandler[DownloadTask, any] = (*DownloadTaskHandler)(nil)
+var _ cqrs.CommandHandler[DownloadTask, struct{}] = (*DownloadTaskHandler)(nil)
 
 // DownloadTask represents a command to download the resource associated with a task.
 type DownloadTask struct {
@@ -39,28 +39,27 @@ func NewDownloadTaskHandler(
 }
 
 // Handle downloads a resource using its latest inspection result.
-func (h *DownloadTaskHandler) Handle(ctx context.Context, cmd DownloadTask) (any, error) {
+func (h *DownloadTaskHandler) Handle(ctx context.Context, cmd DownloadTask) (struct{}, error) {
 	task, err := h.taskRepository.GetByID(ctx, cmd.TaskID)
 
 	if err != nil {
-		return nil, err
+		return struct{}{}, err
 	}
 
 	taskInspection, err := h.taskInspectionRepository.GetLastByTaskID(ctx, cmd.TaskID)
 
 	if err != nil {
-		return nil, err
+		return struct{}{}, err
 	}
 
 	options := download.Options{
 		InspectionResult: inspect.Result{
-			EffectiveURL:     taskInspection.EffectiveURL(),
-			ContentType:      taskInspection.ContentType(),
-			Filename:         taskInspection.Filename(),
-			Size:             taskInspection.Size(),
-			DownloadStrategy: taskInspection.Strategy(),
-			ETag:             taskInspection.ETag(),
-			LastModified:     taskInspection.LastModifiedAt(),
+			EffectiveURL: taskInspection.EffectiveURL(),
+			ContentType:  taskInspection.ContentType(),
+			Filename:     taskInspection.Filename(),
+			Size:         taskInspection.Size(),
+			ETag:         taskInspection.ETag(),
+			LastModified: taskInspection.LastModifiedAt(),
 		},
 		Headers:  task.Headers().Map(),
 		Filename: task.Filename(),
@@ -68,27 +67,27 @@ func (h *DownloadTaskHandler) Handle(ctx context.Context, cmd DownloadTask) (any
 
 	if downloadErr := h.downloader.Download(ctx, options); downloadErr != nil {
 		if ctx.Err() != nil {
-			return nil, ctx.Err()
+			return struct{}{}, ctx.Err()
 		}
 
 		if failTransitionErr := task.Fail(); failTransitionErr != nil {
-			return nil, errors.Join(downloadErr, failTransitionErr)
+			return struct{}{}, errors.Join(downloadErr, failTransitionErr)
 		}
 
 		if updateErr := h.taskRepository.Update(ctx, task); updateErr != nil {
-			return nil, errors.Join(downloadErr, updateErr)
+			return struct{}{}, errors.Join(downloadErr, updateErr)
 		}
 
-		return nil, err
+		return struct{}{}, err
 	}
 
 	if completeTransitionErr := task.Complete(); completeTransitionErr != nil {
-		return nil, completeTransitionErr
+		return struct{}{}, completeTransitionErr
 	}
 
 	if err := h.taskRepository.Update(ctx, task); err != nil {
-		return nil, err
+		return struct{}{}, err
 	}
 
-	return nil, nil
+	return struct{}{}, nil
 }

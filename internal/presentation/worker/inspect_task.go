@@ -6,106 +6,52 @@ import (
 	"time"
 
 	"github.com/codememory1/d8r/internal/application/command"
-	"github.com/codememory1/d8r/internal/domain/valueobject"
-	"github.com/codememory1/d8r/internal/infrastructure/config"
 	"github.com/codememory1/d8r/pkg/cqrs"
-	"golang.org/x/sync/errgroup"
 )
 
 // InspectTaskWorker claims pending tasks and inspects them concurrently.
 type InspectTaskWorker struct {
-	logger             *slog.Logger
-	config             *config.InspectionWorker
-	taskClaimer        command.TaskClaimer
-	inspectTaskHandler cqrs.CommandHandler[command.InspectTask, valueobject.ID]
+	logger                     *slog.Logger
+	inspectPendingTasksHandler cqrs.CommandHandler[command.InspectPendingTasks, struct{}]
+	concurrency                int
+	limit                      int
 }
 
 // NewInspectTaskWorker creates a worker for processing pending task inspections.
 func NewInspectTaskWorker(
 	logger *slog.Logger,
-	config *config.InspectionWorker,
-	taskClaimer command.TaskClaimer,
-	inspectTaskHandler cqrs.CommandHandler[command.InspectTask, valueobject.ID],
+	inspectPendingTasksHandler cqrs.CommandHandler[command.InspectPendingTasks, struct{}],
+	concurrency int,
+	limit int,
 ) *InspectTaskWorker {
 	return &InspectTaskWorker{
-		logger:             logger,
-		config:             config,
-		taskClaimer:        taskClaimer,
-		inspectTaskHandler: inspectTaskHandler,
+		logger:                     logger,
+		inspectPendingTasksHandler: inspectPendingTasksHandler,
+		concurrency:                concurrency,
+		limit:                      limit,
 	}
 }
 
 // Run continuously claims and processes pending tasks until the context is
 // canceled or an unrecoverable error occurs.
 func (w *InspectTaskWorker) Run(ctx context.Context) error {
+	timer := time.NewTimer(1 * time.Second)
+	defer timer.Stop()
+
 	for {
-		taskIDs, err := w.taskClaimer.ClaimPending(ctx, int(w.config.Concurrency))
+		_, err := w.inspectPendingTasksHandler.Handle(ctx, command.InspectPendingTasks{
+			Concurrency: w.concurrency,
+			Limit:       w.limit,
+		})
 
 		if err != nil {
-			return err
+			w.logger.ErrorContext(ctx, "Failed to inspect pending tasks", slog.Any("error", err))
 		}
 
-		if len(taskIDs) == 0 {
-			if err := w.wait(ctx); err != nil {
-				return err
-			}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-timer.C:
 		}
-
-		if err := w.processTasks(ctx, taskIDs); err != nil {
-			return err
-		}
-	}
-}
-
-// processTasks processes the claimed tasks concurrently up to the configured
-// concurrency limit.
-func (w *InspectTaskWorker) processTasks(ctx context.Context, taskIDs []valueobject.ID) error {
-	var group errgroup.Group
-
-	group.SetLimit(int(w.config.Concurrency))
-
-	for _, taskID := range taskIDs {
-		group.Go(func() error {
-			return w.processTask(ctx, taskID)
-		})
-	}
-
-	return group.Wait()
-}
-
-// processTask inspects a task and transitions it to the failed state when the
-// inspection cannot be completed.
-func (w *InspectTaskWorker) processTask(ctx context.Context, taskID valueobject.ID) error {
-	_, err := w.inspectTaskHandler.Handle(ctx, command.InspectTask{
-		TaskID: taskID,
-	})
-
-	if ctx.Err() != nil {
-		return ctx.Err()
-	}
-
-	if err != nil {
-		w.logger.ErrorContext(
-			ctx,
-			"failed to inspect task",
-			slog.String("task_id", taskID.String()),
-			slog.Any("error", err),
-		)
-	}
-
-	return nil
-}
-
-// wait pauses polling until the polling interval elapses or the context is canceled.
-func (w *InspectTaskWorker) wait(ctx context.Context) error {
-	ticker := time.NewTimer(1 * time.Second)
-
-	defer ticker.Stop()
-
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-ticker.C:
-		return nil
 	}
 }
