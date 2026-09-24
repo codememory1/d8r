@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	"github.com/codememory1/d8r/internal/application/download"
-	"github.com/codememory1/d8r/internal/application/inspect"
 	"github.com/codememory1/d8r/internal/domain/repository"
 	"github.com/codememory1/d8r/internal/domain/valueobject"
 	"github.com/codememory1/d8r/pkg/cqrs"
@@ -52,17 +51,21 @@ func (h *DownloadTaskHandler) Handle(ctx context.Context, cmd DownloadTask) (str
 		return struct{}{}, err
 	}
 
+	filename := task.Filename()
+
+	if filename == nil {
+		filename = taskInspection.Filename()
+	}
+
 	options := download.Options{
-		InspectionResult: inspect.Result{
-			EffectiveURL: taskInspection.EffectiveURL(),
-			ContentType:  taskInspection.ContentType(),
-			Filename:     taskInspection.Filename(),
-			Size:         taskInspection.Size(),
-			ETag:         taskInspection.ETag(),
-			LastModified: taskInspection.LastModifiedAt(),
-		},
-		Headers:  task.Headers().Map(),
-		Filename: task.Filename(),
+		URL:          taskInspection.EffectiveURL(),
+		ContentType:  taskInspection.ContentType(),
+		Headers:      task.Headers(),
+		Filename:     filename,
+		Size:         taskInspection.Size(),
+		Strategy:     taskInspection.Strategy(),
+		ETag:         taskInspection.ETag(),
+		LastModified: taskInspection.LastModifiedAt(),
 	}
 
 	if downloadErr := h.downloader.Download(ctx, options); downloadErr != nil {

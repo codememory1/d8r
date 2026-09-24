@@ -15,7 +15,7 @@ func (d *HttpDownloader) downloadSequential(ctx context.Context, options downloa
 		ctx,
 		filename,
 		d.config.BufferSize.Bytes(),
-		new(options.InspectionResult.Size.Int64()),
+		new(options.Size.Int64()),
 	)
 
 	if err != nil {
@@ -24,7 +24,7 @@ func (d *HttpDownloader) downloadSequential(ctx context.Context, options downloa
 
 	defer writer.Close()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, options.InspectionResult.EffectiveURL.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, options.URL.String(), nil)
 
 	if err != nil {
 		return err

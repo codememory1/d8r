@@ -20,7 +20,7 @@ func (d *HttpDownloader) downloadParallel(ctx context.Context, options download.
 		ctx,
 		filename,
 		d.config.BufferSize.Bytes(),
-		new(options.InspectionResult.Size.Int64()),
+		new(options.Size.Int64()),
 	)
 
 	if err != nil {
@@ -35,14 +35,14 @@ func (d *HttpDownloader) downloadParallel(ctx context.Context, options download.
 
 	for i := 0; i < d.config.RangeParts; i++ {
 		// Calculates the HTTP byte range for a specific part.
-		httpRange, err := ResolveHTTPRange(options.InspectionResult.Size.Int64(), i, d.config.RangeParts)
+		httpRange, err := ResolveHTTPRange(options.Size.Int64(), i, d.config.RangeParts)
 
 		if err != nil {
 			return err
 		}
 
 		g.Go(func() error {
-			return d.downloadPart(ctx, options.InspectionResult.EffectiveURL.String(), writer, httpRange)
+			return d.downloadPart(ctx, options.URL.String(), writer, httpRange)
 		})
 	}
 

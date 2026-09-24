@@ -31,15 +31,15 @@ func NewHttpDownloader(client *http.Client, storage storage.Storage, config *con
 
 // Download downloads a resource using the strategy selected during inspection.
 func (d *HttpDownloader) Download(ctx context.Context, options download.Options) error {
-	if options.InspectionResult.DownloadStrategy.Equal(valueobject.SingleDownloadStrategy()) {
+	if options.Strategy.Equal(valueobject.SingleDownloadStrategy()) {
 		return d.downloadSequential(ctx, options)
 	}
 
-	if options.InspectionResult.DownloadStrategy.Equal(valueobject.StreamDownloadStrategy()) {
+	if options.Strategy.Equal(valueobject.StreamDownloadStrategy()) {
 		return nil
 	}
 
-	if options.InspectionResult.DownloadStrategy.Equal(valueobject.ParallelDownloadStrategy()) {
+	if options.Strategy.Equal(valueobject.ParallelDownloadStrategy()) {
 		return d.downloadParallel(ctx, options)
 	}
 
@@ -53,11 +53,11 @@ func (d *HttpDownloader) resolveFilename(options download.Options) string {
 		return options.Filename.String()
 	}
 
-	if options.InspectionResult.Filename != nil {
-		return options.InspectionResult.Filename.String()
+	if options.Filename != nil {
+		return options.Filename.String()
 	}
 
-	contentType := options.InspectionResult.ContentType
+	contentType := options.ContentType
 
 	if contentType != nil {
 		ext, err := mime.ExtensionsByType(contentType.String())
