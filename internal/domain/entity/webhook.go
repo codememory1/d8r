@@ -3,6 +3,7 @@ package entity
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"time"
 
 	"github.com/codememory1/d8r/internal/domain/valueobject"
@@ -113,12 +114,18 @@ func UnmarshalWebhook(
 		return nil, err
 	}
 
+	clonedSubscriptions := maps.Clone(subscriptions)
+
+	if clonedSubscriptions == nil {
+		clonedSubscriptions = make(map[valueobject.WebhookEventType]WebhookSubscription)
+	}
+
 	return &Webhook{
 		id:            id,
 		url:           url,
 		headers:       headers,
 		status:        webhookStatus,
-		subscriptions: subscriptions,
+		subscriptions: clonedSubscriptions,
 		createdAt:     createdAt,
 		updatedAt:     updatedAt,
 	}, nil
@@ -146,7 +153,7 @@ func (w *Webhook) Status() WebhookStatus {
 
 // Subscriptions returns the webhook's event subscriptions.
 func (w *Webhook) Subscriptions() map[valueobject.WebhookEventType]WebhookSubscription {
-	return w.subscriptions
+	return maps.Clone(w.subscriptions)
 }
 
 // CreatedAt returns the time when the webhook was created.
