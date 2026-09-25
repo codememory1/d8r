@@ -4,29 +4,27 @@ import (
 	"context"
 	"log/slog"
 	"time"
-
-	"github.com/codememory1/d8r/internal/application/transaction"
-	infraoutbox "github.com/codememory1/d8r/internal/infrastructure/outbox"
 )
+
+// OutboxRelay processes pending outbox messages.
+type OutboxRelay interface {
+	ProcessBatch(ctx context.Context, limit int) error
+}
 
 // OutboxEventWorker processes pending outbox events and dispatches them
 // to the handlers registered for their event types.
 type OutboxEventWorker struct {
-	tm     transaction.Manager
 	logger *slog.Logger
-	relay  *infraoutbox.Relay
+	relay  OutboxRelay
+	limit  int
 }
 
 // NewOutboxEventWorker creates a new outbox event worker.
-func NewOutboxEventWorker(
-	tm transaction.Manager,
-	logger *slog.Logger,
-	relay *infraoutbox.Relay,
-) *OutboxEventWorker {
+func NewOutboxEventWorker(logger *slog.Logger, relay OutboxRelay, limit int) *OutboxEventWorker {
 	return &OutboxEventWorker{
-		tm:     tm,
 		logger: logger,
 		relay:  relay,
+		limit:  limit,
 	}
 }
 
@@ -35,7 +33,7 @@ func (w *OutboxEventWorker) Run(ctx context.Context) error {
 	defer timer.Stop()
 
 	for {
-		if err := w.relay.ProcessBatch(ctx, 10); err != nil {
+		if err := w.relay.ProcessBatch(ctx, w.limit); err != nil {
 			w.logger.ErrorContext(ctx, "failed to process outbox events", slog.Any("error", err))
 		}
 

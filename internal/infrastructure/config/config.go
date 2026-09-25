@@ -42,8 +42,9 @@ type Download struct {
 }
 
 type Workers struct {
-	Download   DownloadWorker   `yaml:"download"`
-	Inspection InspectionWorker `yaml:"inspection"`
+	Download    DownloadWorker    `yaml:"download"`
+	Inspection  InspectionWorker  `yaml:"inspection"`
+	OutboxEvent OutboxEventWorker `yaml:"outbox_event"`
 }
 
 type DownloadWorker struct {
@@ -52,6 +53,11 @@ type DownloadWorker struct {
 }
 
 type InspectionWorker struct {
+	Concurrency int `yaml:"concurrency"`
+	Limit       int `yaml:"limit"`
+}
+
+type OutboxEventWorker struct {
 	Concurrency int `yaml:"concurrency"`
 	Limit       int `yaml:"limit"`
 }
@@ -92,6 +98,10 @@ func defaults() Config {
 				Limit:       20,
 			},
 			InspectionWorker{
+				Concurrency: 5,
+				Limit:       20,
+			},
+			OutboxEventWorker{
 				Concurrency: 5,
 				Limit:       20,
 			},
@@ -192,6 +202,10 @@ func (c Workers) Validate() error {
 		return err
 	}
 
+	if err := c.OutboxEvent.Validate(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -216,6 +230,19 @@ func (c InspectionWorker) Validate() error {
 
 	if c.Limit <= 0 {
 		return errors.New("workers.inspection.limit must be greater than 0")
+	}
+
+	return nil
+}
+
+// Validate validates the outbox event worker parameters.
+func (c OutboxEventWorker) Validate() error {
+	if c.Concurrency <= 0 {
+		return errors.New("workers.outbox_event.concurrency must be greater than 0")
+	}
+
+	if c.Limit <= 0 {
+		return errors.New("workers.outbox_event.limit must be greater than 0")
 	}
 
 	return nil

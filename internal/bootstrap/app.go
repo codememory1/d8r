@@ -120,7 +120,12 @@ func (a *App) compose() error {
 
 	// Outbox
 	outboxStore := outbox.NewStore(a.Pool)
-	outboxRelay := infraoutbox.NewRelay(outboxStore, eventDecoder, eventDispatcher, 10)
+	outboxRelay := infraoutbox.NewRelay(
+		outboxStore,
+		eventDecoder,
+		eventDispatcher,
+		a.Config.Workers.OutboxEvent.Concurrency,
+	)
 
 	// Init strategy selector
 	strategySelector := download.NewStrategySelector(
@@ -160,7 +165,7 @@ func (a *App) compose() error {
 		a.Config.Workers.Inspection.Concurrency,
 		a.Config.Workers.Inspection.Limit,
 	)
-	a.Workers.OutboxEvent = worker.NewOutboxEventWorker(a.Pool, a.Logger, outboxRelay)
+	a.Workers.OutboxEvent = worker.NewOutboxEventWorker(a.Logger, outboxRelay, a.Config.Workers.OutboxEvent.Limit)
 
 	return nil
 }
