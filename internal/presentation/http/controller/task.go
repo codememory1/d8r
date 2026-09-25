@@ -9,6 +9,7 @@ import (
 	"github.com/codememory1/d8r/internal/domain/valueobject"
 	httppagination "github.com/codememory1/d8r/internal/presentation/http/pagination"
 	"github.com/codememory1/d8r/internal/presentation/http/request"
+	"github.com/codememory1/d8r/internal/presentation/http/response"
 	"github.com/codememory1/d8r/pkg/cqrs"
 	"github.com/codememory1/d8r/pkg/restful"
 	"github.com/codememory1/d8r/pkg/restful/respond"
@@ -59,9 +60,11 @@ func (c *TaskController) Create(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	return c.responder.Respond(w, http.StatusCreated, respond.NewSuccessBody(map[string]any{
-		"id": id.String(),
-	}))
+	return c.responder.Respond(
+		w,
+		http.StatusCreated,
+		respond.NewSuccessBody(response.NewCreateTask(id)),
+	)
 }
 
 // Get handles a request to retrieve a task by its identifier.
@@ -85,7 +88,11 @@ func (c *TaskController) Get(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	return c.responder.Respond(w, http.StatusOK, respond.NewSuccessBody(result))
+	return c.responder.Respond(
+		w,
+		http.StatusOK,
+		respond.NewSuccessBody(response.FromGetTaskResult(result)),
+	)
 }
 
 // List handles a request to retrieve a collection of tasks.
@@ -121,7 +128,7 @@ func (c *TaskController) List(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	responseBody := respond.
-		NewSuccessBody(result.Items).
+		NewSuccessBody(response.FromTaskListItems(result.Items)).
 		WithCursorPagination(q.Limit, nextCursor)
 
 	return c.responder.Respond(w, http.StatusOK, responseBody)
