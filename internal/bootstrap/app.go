@@ -140,6 +140,8 @@ func (a *App) compose() error {
 	)
 	downloadTaskHandler := command.NewDownloadTaskHandler(taskRepository, taskInspectionRepository, httpDownloader)
 	createWebhookHandler := command.NewCreateWebhookHandler(webhookRepository)
+	downloadReadyTasksHandlers := command.NewDownloadReadyTasksHandler(taskRepository, downloadTaskHandler)
+	inspectPendingTasksHandler := command.NewInspectPendingTasksHandler(taskRepository, inspectTaskHandler)
 
 	// Init Controllers
 	a.Controllers.Task = controller.NewTaskController(jsonResponder, createTaskHandler, getTaskHandler, listTasksHandler)
@@ -148,15 +150,15 @@ func (a *App) compose() error {
 	// Init Workers
 	a.Workers.DownloadTask = worker.NewDownloadTaskWorker(
 		a.Logger,
-		&a.Config.Workers.Download,
-		taskRepository,
-		downloadTaskHandler,
+		downloadReadyTasksHandlers,
+		a.Config.Workers.Download.Concurrency,
+		a.Config.Workers.Download.Limit,
 	)
 	a.Workers.InspectTask = worker.NewInspectTaskWorker(
 		a.Logger,
-		&a.Config.Workers.Inspection,
-		taskRepository,
-		inspectTaskHandler,
+		inspectPendingTasksHandler,
+		a.Config.Workers.Inspection.Concurrency,
+		a.Config.Workers.Inspection.Limit,
 	)
 	a.Workers.OutboxEvent = worker.NewOutboxEventWorker(a.Pool, a.Logger, outboxRelay)
 

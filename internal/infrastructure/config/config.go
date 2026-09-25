@@ -47,11 +47,13 @@ type Workers struct {
 }
 
 type DownloadWorker struct {
-	Concurrency uint64 `yaml:"concurrency"`
+	Concurrency int `yaml:"concurrency"`
+	Limit       int `yaml:"limit"`
 }
 
 type InspectionWorker struct {
-	Concurrency uint64 `yaml:"concurrency"`
+	Concurrency int `yaml:"concurrency"`
+	Limit       int `yaml:"limit"`
 }
 
 type WebhookConfig struct {
@@ -87,9 +89,11 @@ func defaults() Config {
 		Workers: Workers{
 			DownloadWorker{
 				Concurrency: 5,
+				Limit:       20,
 			},
 			InspectionWorker{
 				Concurrency: 5,
+				Limit:       20,
 			},
 		},
 		Webhook: WebhookConfig{
@@ -197,6 +201,10 @@ func (c DownloadWorker) Validate() error {
 		return errors.New("workers.download.concurrency must be greater than 0")
 	}
 
+	if c.Limit <= 0 {
+		return errors.New("workers.download.limit must be greater than 0")
+	}
+
 	return nil
 }
 
@@ -204,6 +212,10 @@ func (c DownloadWorker) Validate() error {
 func (c InspectionWorker) Validate() error {
 	if c.Concurrency <= 0 {
 		return errors.New("workers.inspection.concurrency must be greater than 0")
+	}
+
+	if c.Limit <= 0 {
+		return errors.New("workers.inspection.limit must be greater than 0")
 	}
 
 	return nil
