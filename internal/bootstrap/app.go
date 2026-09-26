@@ -130,7 +130,7 @@ func NewApp(
 		Password: configuration.Postgres.Password,
 		Database: configuration.Postgres.Database,
 	})
-	
+
 	if err != nil {
 		return nil, err
 	}

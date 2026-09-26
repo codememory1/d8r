@@ -2,15 +2,9 @@ package repository
 
 import (
 	"context"
-	"errors"
 
 	"github.com/codememory1/d8r/internal/domain/entity"
 	"github.com/codememory1/d8r/internal/domain/valueobject"
-)
-
-var (
-	// ErrTaskNotFound is returned when a task with the requested identifier does not exist.
-	ErrTaskNotFound = errors.New("task not found")
 )
 
 // TaskRepository defines persistence operations for task entities.

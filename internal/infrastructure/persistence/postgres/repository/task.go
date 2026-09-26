@@ -79,7 +79,7 @@ func (r *TaskRepository) GetByID(ctx context.Context, id valueobject.ID) (*entit
 	err = pgxscan.Get(ctx, r.connection, &model, sql, args...)
 
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, repository.ErrTaskNotFound
+		return nil, repository.ErrNotFound
 	}
 
 	if err != nil {
