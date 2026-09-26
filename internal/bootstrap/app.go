@@ -26,8 +26,8 @@ import (
 	"github.com/codememory1/d8r/internal/infrastructure/persistence/postgres/reader"
 	postgresrepo "github.com/codememory1/d8r/internal/infrastructure/persistence/postgres/repository"
 	"github.com/codememory1/d8r/internal/infrastructure/storage/filesystem"
+	worker2 "github.com/codememory1/d8r/internal/infrastructure/worker"
 	"github.com/codememory1/d8r/internal/presentation/http/controller"
-	"github.com/codememory1/d8r/internal/presentation/worker"
 	"github.com/codememory1/d8r/pkg/ddd"
 	"github.com/codememory1/d8r/pkg/restful"
 	"github.com/codememory1/d8r/pkg/restful/respond"
@@ -43,7 +43,7 @@ type Services struct {
 	EventEncoder     infraoutbox.Encoder
 	EventDecoder     infraoutbox.Decoder
 	OutboxStore      infraoutbox.Store
-	OutboxRelay      worker.OutboxRelay
+	OutboxRelay      worker2.OutboxRelay
 	StrategySelector *appdownload.StrategySelector
 	Inspector        appinspect.Inspector
 	Downloader       appdownload.Downloader
@@ -92,9 +92,9 @@ type Controllers struct {
 
 // Workers contains background workers executed by the application.
 type Workers struct {
-	DownloadTask *worker.DownloadTaskWorker
-	InspectTask  *worker.InspectTaskWorker
-	OutboxEvent  *worker.OutboxEventWorker
+	DownloadTask *worker2.DownloadTaskWorker
+	InspectTask  *worker2.InspectTaskWorker
+	OutboxEvent  *worker2.OutboxEventWorker
 }
 
 // App is the application composition root and owns its dependencies.
@@ -306,21 +306,21 @@ func (a *App) initPresentation() {
 
 // initWorkers initializes background application workers.
 func (a *App) initWorkers() {
-	a.Workers.DownloadTask = worker.NewDownloadTaskWorker(
+	a.Workers.DownloadTask = worker2.NewDownloadTaskWorker(
 		a.Logger,
 		a.CommandHandlers.DownloadReadyTasks,
 		a.Config.Workers.Download.Concurrency,
 		a.Config.Workers.Download.Limit,
 	)
 
-	a.Workers.InspectTask = worker.NewInspectTaskWorker(
+	a.Workers.InspectTask = worker2.NewInspectTaskWorker(
 		a.Logger,
 		a.CommandHandlers.InspectPendingTask,
 		a.Config.Workers.Inspection.Concurrency,
 		a.Config.Workers.Inspection.Limit,
 	)
 
-	a.Workers.OutboxEvent = worker.NewOutboxEventWorker(
+	a.Workers.OutboxEvent = worker2.NewOutboxEventWorker(
 		a.Logger,
 		a.Services.OutboxRelay,
 		a.Config.Workers.OutboxEvent.Limit,
