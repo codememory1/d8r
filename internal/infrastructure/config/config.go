@@ -12,7 +12,7 @@ import (
 type Config struct {
 	HTTP     HTTP          `yaml:"http"`
 	Postgres Postgres      `yaml:"postgres"`
-	Download Download      `yaml:"httpdownload"`
+	Download Download      `yaml:"download"`
 	Workers  Workers       `yaml:"workers"`
 	Webhook  WebhookConfig `yaml:"webhook"`
 }
@@ -186,7 +186,7 @@ func (c Postgres) Validate() error {
 // Validate validates Download configuration parameters.
 func (c Download) Validate() error {
 	if c.MinParallelSize.Bytes() <= 0 {
-		return errors.New("httpdownload.min_parallel_size must be greater than 0")
+		return errors.New("download.min_parallel_size must be greater than 0")
 	}
 
 	return nil

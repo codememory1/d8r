@@ -40,7 +40,7 @@ func NewTaskController(
 	}
 }
 
-// Create handles a request to create a new httpdownload task.
+// Create handles a request to create a new download task.
 func (c *TaskController) Create(w http.ResponseWriter, r *http.Request) error {
 	req, err := restful.DecodeBody[request.CreateTask](r.Body)
 

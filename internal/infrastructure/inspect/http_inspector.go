@@ -8,14 +8,14 @@ import (
 )
 
 // HttpInspector inspects HTTP resources and determines the appropriate
-// httpdownload strategy from response metadata and range support.
+// download strategy from response metadata and range support.
 type HttpInspector struct {
 	client  *http.Client
 	options Options
 }
 
 // NewHttpInspector creates an HTTP resource inspector with the provided
-// client and httpdownload configuration.
+// client and download configuration.
 func NewHttpInspector(client *http.Client, options Options) *HttpInspector {
 	options.ReservedHeaders = append([]string(nil), options.ReservedHeaders...)
 

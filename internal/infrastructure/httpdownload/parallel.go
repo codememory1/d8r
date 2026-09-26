@@ -9,7 +9,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// downloadParallel Performs a parallel httpdownload of a resource by splitting it into ranges
+// downloadParallel Performs a parallel download of a resource by splitting it into ranges
 // and downloading them simultaneously, subject to a limit on the number
 // of parallel requests.
 func (d *HttpDownloader) downloadParallel(ctx context.Context, options download.Options) error {

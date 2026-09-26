@@ -24,7 +24,7 @@ func NewDownloadStrategy(value string) (DownloadStrategy, error) {
 		downloadStrategyStream:
 		return DownloadStrategy{value}, nil
 	default:
-		return DownloadStrategy{}, domain.NewValidationError("invalid httpdownload strategy", nil)
+		return DownloadStrategy{}, domain.NewValidationError("invalid download strategy", nil)
 	}
 }
 
