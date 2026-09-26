@@ -123,7 +123,14 @@ func NewApp(
 	configuration config.Config,
 	logger *slog.Logger,
 ) (*App, error) {
-	postgresPool, err := postgres.NewConnectionPool(ctx, configuration.Postgres)
+	postgresPool, err := postgres.NewConnectionPool(ctx, postgres.Options{
+		Host:     configuration.Postgres.Host,
+		Port:     configuration.Postgres.Port,
+		User:     configuration.Postgres.User,
+		Password: configuration.Postgres.Password,
+		Database: configuration.Postgres.Database,
+	})
+	
 	if err != nil {
 		return nil, err
 	}
