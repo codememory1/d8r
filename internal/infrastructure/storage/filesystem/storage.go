@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/codememory1/d8r/internal/application/storage"
+	"github.com/codememory1/d8r/internal/infrastructure/storage"
 )
 
 type Storage struct {

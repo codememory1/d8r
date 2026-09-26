@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/codememory1/d8r/internal/application/download"
-	"github.com/codememory1/d8r/internal/application/storage"
+	"github.com/codememory1/d8r/internal/infrastructure/storage"
 	"golang.org/x/sync/errgroup"
 )
 

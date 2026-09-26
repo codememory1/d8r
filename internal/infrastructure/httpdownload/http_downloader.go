@@ -7,8 +7,8 @@ import (
 	"net/http"
 
 	"github.com/codememory1/d8r/internal/application/download"
-	"github.com/codememory1/d8r/internal/application/storage"
 	"github.com/codememory1/d8r/internal/domain/valueobject"
+	"github.com/codememory1/d8r/internal/infrastructure/storage"
 	"github.com/google/uuid"
 )
 
