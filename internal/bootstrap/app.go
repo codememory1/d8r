@@ -203,14 +203,20 @@ func (a *App) initServices() {
 
 	a.Services.Inspector = inspect.NewHttpInspector(
 		&http.Client{},
-		&a.Config.Download,
-		make([]string, 0),
+		inspect.Options{
+			MinRangeProbeSize: a.Config.Download.MinParallelSize.Bytes(),
+			ReservedHeaders:   make([]string, 0),
+		},
 	)
 
 	a.Services.Downloader = httpdownload.NewHttpDownloader(
 		&http.Client{},
 		a.Services.Storage,
-		&a.Config.Download,
+		httpdownload.Options{
+			BufferSize:       a.Config.Download.BufferSize.Bytes(),
+			MaxParallelParts: a.Config.Download.MaxParallelParts,
+			RangeParts:       a.Config.Download.RangeParts,
+		},
 	)
 }
 

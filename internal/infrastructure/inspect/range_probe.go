@@ -46,5 +46,5 @@ func (i *HttpInspector) shouldProbeRange(headResp *http.Response) bool {
 		return true
 	}
 
-	return headResp.ContentLength >= i.config.MinParallelSize.Bytes()
+	return headResp.ContentLength >= i.options.MinRangeProbeSize
 }

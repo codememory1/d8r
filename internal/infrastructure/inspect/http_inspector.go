@@ -5,24 +5,23 @@ import (
 	"net/http"
 
 	"github.com/codememory1/d8r/internal/application/inspect"
-	"github.com/codememory1/d8r/internal/infrastructure/config"
 )
 
 // HttpInspector inspects HTTP resources and determines the appropriate
 // httpdownload strategy from response metadata and range support.
 type HttpInspector struct {
-	client          *http.Client
-	config          *config.Download
-	reservedHeaders []string
+	client  *http.Client
+	options Options
 }
 
 // NewHttpInspector creates an HTTP resource inspector with the provided
 // client and httpdownload configuration.
-func NewHttpInspector(client *http.Client, config *config.Download, reservedHeaders []string) *HttpInspector {
+func NewHttpInspector(client *http.Client, options Options) *HttpInspector {
+	options.ReservedHeaders = append([]string(nil), options.ReservedHeaders...)
+
 	return &HttpInspector{
-		client:          client,
-		config:          config,
-		reservedHeaders: reservedHeaders,
+		client:  client,
+		options: options,
 	}
 }
 

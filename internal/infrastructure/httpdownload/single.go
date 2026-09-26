@@ -14,7 +14,7 @@ func (d *HttpDownloader) downloadSequential(ctx context.Context, options downloa
 	writer, err := d.storage.CreateWriter(
 		ctx,
 		filename,
-		d.config.BufferSize.Bytes(),
+		d.options.BufferSize,
 		new(options.Size.Int64()),
 	)
 

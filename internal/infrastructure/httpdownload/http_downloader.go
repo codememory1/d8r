@@ -9,7 +9,6 @@ import (
 	"github.com/codememory1/d8r/internal/application/download"
 	"github.com/codememory1/d8r/internal/application/storage"
 	"github.com/codememory1/d8r/internal/domain/valueobject"
-	"github.com/codememory1/d8r/internal/infrastructure/config"
 	"github.com/google/uuid"
 )
 
@@ -17,15 +16,15 @@ import (
 type HttpDownloader struct {
 	client  *http.Client
 	storage storage.Storage
-	config  *config.Download
+	options Options
 }
 
 // NewHttpDownloader creates a new HTTP downloader.
-func NewHttpDownloader(client *http.Client, storage storage.Storage, config *config.Download) *HttpDownloader {
+func NewHttpDownloader(client *http.Client, storage storage.Storage, options Options) *HttpDownloader {
 	return &HttpDownloader{
 		client:  client,
 		storage: storage,
-		config:  config,
+		options: options,
 	}
 }
 
