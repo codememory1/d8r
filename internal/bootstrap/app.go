@@ -6,25 +6,83 @@ import (
 	"net/http"
 
 	"github.com/codememory1/d8r/internal/application/command"
-	"github.com/codememory1/d8r/internal/application/download"
+	appdownload "github.com/codememory1/d8r/internal/application/download"
+	appevent "github.com/codememory1/d8r/internal/application/event"
+	appinspect "github.com/codememory1/d8r/internal/application/inspect"
 	"github.com/codememory1/d8r/internal/application/query"
+	"github.com/codememory1/d8r/internal/application/storage"
 	"github.com/codememory1/d8r/internal/application/transaction"
+	domainevent "github.com/codememory1/d8r/internal/domain/event"
+	domainrepo "github.com/codememory1/d8r/internal/domain/repository"
 	"github.com/codememory1/d8r/internal/infrastructure/config"
 	"github.com/codememory1/d8r/internal/infrastructure/eventbus"
 	"github.com/codememory1/d8r/internal/infrastructure/eventcodec"
+	"github.com/codememory1/d8r/internal/infrastructure/eventregistry"
 	"github.com/codememory1/d8r/internal/infrastructure/httpdownload"
 	"github.com/codememory1/d8r/internal/infrastructure/inspect"
 	infraoutbox "github.com/codememory1/d8r/internal/infrastructure/outbox"
 	"github.com/codememory1/d8r/internal/infrastructure/persistence/postgres"
 	"github.com/codememory1/d8r/internal/infrastructure/persistence/postgres/outbox"
 	"github.com/codememory1/d8r/internal/infrastructure/persistence/postgres/reader"
-	"github.com/codememory1/d8r/internal/infrastructure/persistence/postgres/repository"
+	postgresrepo "github.com/codememory1/d8r/internal/infrastructure/persistence/postgres/repository"
 	"github.com/codememory1/d8r/internal/infrastructure/storage/filesystem"
 	"github.com/codememory1/d8r/internal/presentation/http/controller"
 	"github.com/codememory1/d8r/internal/presentation/worker"
+	"github.com/codememory1/d8r/pkg/ddd"
 	"github.com/codememory1/d8r/pkg/restful"
 	"github.com/codememory1/d8r/pkg/restful/respond"
 )
+
+// Services contains shared application and infrastructure services.
+type Services struct {
+	Responder        respond.Responder
+	Storage          storage.Storage
+	EventDispatcher  appevent.Dispatcher
+	EventPublisher   appevent.Publisher
+	EventRegistry    infraoutbox.EventRegistry
+	EventEncoder     infraoutbox.Encoder
+	EventDecoder     infraoutbox.Decoder
+	OutboxStore      infraoutbox.Store
+	OutboxRelay      worker.OutboxRelay
+	StrategySelector *appdownload.StrategySelector
+	Inspector        appinspect.Inspector
+	Downloader       appdownload.Downloader
+}
+
+// Repositories contains domain repository implementations used by the application.
+type Repositories struct {
+	Task           domainrepo.TaskRepository
+	TaskInspection domainrepo.TaskInspectionRepository
+	Webhook        domainrepo.WebhookRepository
+}
+
+// Claimers contains application dependencies responsible for claiming tasks
+// that are ready for background processing.
+type Claimers struct {
+	PendingTask         command.PendingTaskClaimer
+	ReadyToDownloadTask command.ReadyToDownloadTaskClaimer
+}
+
+// Readers contains read-side dependencies used by query handlers.
+type Readers struct {
+	Task query.TaskReader
+}
+
+// CommandHandlers contains handlers responsible for application commands.
+type CommandHandlers struct {
+	CreateTask         *command.CreateTaskHandler
+	CreateWebhook      *command.CreateWebhookHandler
+	InspectTask        *command.InspectTaskHandler
+	InspectPendingTask *command.InspectPendingTasksHandler
+	DownloadTask       *command.DownloadTaskHandler
+	DownloadReadyTasks *command.DownloadReadyTasksHandler
+}
+
+// QueryHandlers contains handlers responsible for application queries.
+type QueryHandlers struct {
+	GetTask   *query.GetTaskHandler
+	ListTasks *query.ListTasksHandler
+}
 
 // Controllers contains the application's HTTP controllers.
 type Controllers struct {
@@ -32,28 +90,40 @@ type Controllers struct {
 	Webhook *controller.WebhookController
 }
 
+// Workers contains background workers executed by the application.
 type Workers struct {
 	DownloadTask *worker.DownloadTaskWorker
 	InspectTask  *worker.InspectTaskWorker
 	OutboxEvent  *worker.OutboxEventWorker
 }
 
-// App contains the application's configuration, infrastructure dependencies,
-// and presentation-layer components.
+// App is the application composition root and owns its dependencies.
 type App struct {
-	Config         config.Config
-	Pool           *postgres.ConnectionPool
-	Transaction    transaction.Manager
-	Logger         *slog.Logger
+	Config      config.Config
+	Pool        *postgres.ConnectionPool
+	Transaction transaction.Manager
+	Logger      *slog.Logger
+
+	Services     Services
+	Repositories Repositories
+	Claimers     Claimers
+	Readers      Readers
+
+	CommandHandlers CommandHandlers
+	QueryHandlers   QueryHandlers
+
 	HandlerAdapter *restful.HandlerAdapter
 	Controllers    Controllers
 	Workers        Workers
 }
 
 // NewApp initializes the application and composes its dependencies.
-func NewApp(ctx context.Context, configuration config.Config, logger *slog.Logger) (*App, error) {
+func NewApp(
+	ctx context.Context,
+	configuration config.Config,
+	logger *slog.Logger,
+) (*App, error) {
 	postgresPool, err := postgres.NewConnectionPool(ctx, configuration.Postgres)
-
 	if err != nil {
 		return nil, err
 	}
@@ -81,91 +151,172 @@ func (a *App) Close() {
 	}
 }
 
-// compose creates and connects the application's dependencies.
+// compose initializes and connects application dependencies in dependency order.
 func (a *App) compose() error {
-	// Init Responders
-	jsonResponder := respond.NewJSONResponder()
+	a.initServices()
+	a.initPersistence()
+	a.initReaders()
 
-	// Init handler adapter
-	a.HandlerAdapter = restful.NewHandlerAdapter(jsonResponder)
+	a.initCommandHandlers()
+	a.initQueryHandlers()
 
-	// Init Repositories
-	taskRepository := repository.NewTaskRepository(a.Pool)
-	taskInspectionRepository := repository.NewTaskInspectionRepository(a.Pool)
-	webhookRepository := repository.NewWebhookRepository(a.Pool)
+	a.initPresentation()
+	a.initWorkers()
 
-	// Init Readers
-	taskReader := reader.NewTaskReader(a.Pool)
+	return nil
+}
 
-	// Init clients
-	client := http.Client{}
+// initServices initializes shared application and infrastructure services.
+func (a *App) initServices() {
+	eventRegistry := eventregistry.NewRegistry()
 
-	// Init Storages
-	fsStorage := filesystem.NewStorage("./files")
+	eventRegistry.Register(domainevent.TaskCreatedType, func() ddd.Event {
+		return &domainevent.TaskCreated{}
+	})
 
-	// Init Downloader
-	httpDownloader := httpdownload.NewHttpDownloader(&client, fsStorage, &a.Config.Download)
+	a.Services.Responder = respond.NewJSONResponder()
+	a.Services.Storage = filesystem.NewStorage("./files")
 
-	// Init Inspector
-	httpInspector := inspect.NewHttpInspector(&client, &a.Config.Download, make([]string, 0))
+	a.Services.EventRegistry = eventRegistry
+	a.Services.EventEncoder = eventcodec.NewEncoder()
+	a.Services.EventDecoder = eventcodec.NewDecoder()
+	a.Services.EventDispatcher = eventbus.NewDispatcher()
 
-	// Init Event Dispatcher
-	eventDispatcher := eventbus.NewDispatcher()
+	a.Services.EventPublisher = outbox.NewPublisher(
+		a.Pool,
+		a.Services.EventEncoder,
+	)
 
-	// Init Event Decoder
-	eventDecoder := eventcodec.NewDecoder()
+	a.Services.OutboxStore = outbox.NewStore(a.Pool)
 
-	// Event Publisher
-	eventPublisher := outbox.NewPublisher(a.Pool)
-
-	// Outbox
-	outboxStore := outbox.NewStore(a.Pool)
-	outboxRelay := infraoutbox.NewRelay(
-		outboxStore,
-		eventDecoder,
-		eventDispatcher,
+	a.Services.OutboxRelay = infraoutbox.NewRelay(
+		a.Services.EventRegistry,
+		a.Services.EventDecoder,
+		a.Services.OutboxStore,
+		a.Services.EventDispatcher,
 		a.Config.Workers.OutboxEvent.Concurrency,
 	)
 
-	// Init strategy selector
-	strategySelector := download.NewStrategySelector(
+	a.Services.StrategySelector = appdownload.NewStrategySelector(
 		a.Config.Download.MinParallelSize.Bytes(),
 	)
 
-	// Init Query/Command Handlers
-	createTaskHandler := command.NewCreateTaskHandler(a.Pool, eventPublisher, taskRepository)
-	getTaskHandler := query.NewGetTaskHandler(taskReader)
-	listTasksHandler := query.NewListTasksHandler(taskReader)
-	inspectTaskHandler := command.NewInspectTaskHandler(
-		httpInspector,
-		strategySelector,
-		taskRepository,
-		taskInspectionRepository,
+	a.Services.Inspector = inspect.NewHttpInspector(
+		&http.Client{},
+		&a.Config.Download,
+		make([]string, 0),
+	)
+
+	a.Services.Downloader = httpdownload.NewHttpDownloader(
+		&http.Client{},
+		a.Services.Storage,
+		&a.Config.Download,
+	)
+}
+
+// initPersistence initializes repository and task-claiming implementations.
+func (a *App) initPersistence() {
+	taskRepository := postgresrepo.NewTaskRepository(a.Pool)
+
+	a.Repositories.Task = taskRepository
+	a.Repositories.TaskInspection = postgresrepo.NewTaskInspectionRepository(a.Pool)
+	a.Repositories.Webhook = postgresrepo.NewWebhookRepository(a.Pool)
+
+	a.Claimers.PendingTask = taskRepository
+	a.Claimers.ReadyToDownloadTask = taskRepository
+}
+
+// initReaders initializes read-side persistence dependencies.
+func (a *App) initReaders() {
+	a.Readers.Task = reader.NewTaskReader(a.Pool)
+}
+
+// initCommandHandlers initializes application command handlers.
+func (a *App) initCommandHandlers() {
+	a.CommandHandlers.CreateTask = command.NewCreateTaskHandler(
+		a.Transaction,
+		a.Services.EventPublisher,
+		a.Repositories.Task,
+	)
+
+	a.CommandHandlers.InspectTask = command.NewInspectTaskHandler(
+		a.Services.Inspector,
+		a.Services.StrategySelector,
+		a.Repositories.Task,
+		a.Repositories.TaskInspection,
 		a.Transaction,
 	)
-	downloadTaskHandler := command.NewDownloadTaskHandler(taskRepository, taskInspectionRepository, httpDownloader)
-	createWebhookHandler := command.NewCreateWebhookHandler(webhookRepository)
-	downloadReadyTasksHandlers := command.NewDownloadReadyTasksHandler(taskRepository, downloadTaskHandler)
-	inspectPendingTasksHandler := command.NewInspectPendingTasksHandler(taskRepository, inspectTaskHandler)
 
-	// Init Controllers
-	a.Controllers.Task = controller.NewTaskController(jsonResponder, createTaskHandler, getTaskHandler, listTasksHandler)
-	a.Controllers.Webhook = controller.NewWebhookController(jsonResponder, createWebhookHandler)
+	a.CommandHandlers.DownloadTask = command.NewDownloadTaskHandler(
+		a.Repositories.Task,
+		a.Repositories.TaskInspection,
+		a.Services.Downloader,
+	)
 
-	// Init Workers
+	a.CommandHandlers.CreateWebhook = command.NewCreateWebhookHandler(
+		a.Repositories.Webhook,
+	)
+
+	a.CommandHandlers.DownloadReadyTasks = command.NewDownloadReadyTasksHandler(
+		a.Claimers.ReadyToDownloadTask,
+		a.CommandHandlers.DownloadTask,
+	)
+
+	a.CommandHandlers.InspectPendingTask = command.NewInspectPendingTasksHandler(
+		a.Claimers.PendingTask,
+		a.CommandHandlers.InspectTask,
+	)
+}
+
+// initQueryHandlers initializes application query handlers.
+func (a *App) initQueryHandlers() {
+	a.QueryHandlers.GetTask = query.NewGetTaskHandler(
+		a.Readers.Task,
+	)
+
+	a.QueryHandlers.ListTasks = query.NewListTasksHandler(
+		a.Readers.Task,
+	)
+}
+
+// initPresentation initializes HTTP presentation-layer dependencies.
+func (a *App) initPresentation() {
+	a.HandlerAdapter = restful.NewHandlerAdapter(
+		a.Services.Responder,
+	)
+
+	a.Controllers.Task = controller.NewTaskController(
+		a.Services.Responder,
+		a.CommandHandlers.CreateTask,
+		a.QueryHandlers.GetTask,
+		a.QueryHandlers.ListTasks,
+	)
+
+	a.Controllers.Webhook = controller.NewWebhookController(
+		a.Services.Responder,
+		a.CommandHandlers.CreateWebhook,
+	)
+}
+
+// initWorkers initializes background application workers.
+func (a *App) initWorkers() {
 	a.Workers.DownloadTask = worker.NewDownloadTaskWorker(
 		a.Logger,
-		downloadReadyTasksHandlers,
+		a.CommandHandlers.DownloadReadyTasks,
 		a.Config.Workers.Download.Concurrency,
 		a.Config.Workers.Download.Limit,
 	)
+
 	a.Workers.InspectTask = worker.NewInspectTaskWorker(
 		a.Logger,
-		inspectPendingTasksHandler,
+		a.CommandHandlers.InspectPendingTask,
 		a.Config.Workers.Inspection.Concurrency,
 		a.Config.Workers.Inspection.Limit,
 	)
-	a.Workers.OutboxEvent = worker.NewOutboxEventWorker(a.Logger, outboxRelay, a.Config.Workers.OutboxEvent.Limit)
 
-	return nil
+	a.Workers.OutboxEvent = worker.NewOutboxEventWorker(
+		a.Logger,
+		a.Services.OutboxRelay,
+		a.Config.Workers.OutboxEvent.Limit,
+	)
 }

@@ -2,7 +2,6 @@ package outbox
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -18,18 +17,21 @@ var _ appevent.Publisher = (*Publisher)(nil)
 
 type Publisher struct {
 	connection *postgres.ConnectionPool
+	encoder    infraoutbox.Encoder
 }
 
 func NewPublisher(
 	connection *postgres.ConnectionPool,
+	encoder infraoutbox.Encoder,
 ) *Publisher {
 	return &Publisher{
 		connection: connection,
+		encoder:    encoder,
 	}
 }
 
 func (p *Publisher) Publish(ctx context.Context, event ddd.Event) error {
-	payload, err := json.Marshal(event)
+	payload, err := p.encoder.Encode(event)
 
 	if err != nil {
 		return err

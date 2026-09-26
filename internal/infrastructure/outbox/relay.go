@@ -8,21 +8,24 @@ import (
 )
 
 type Relay struct {
-	store       Store
+	registry    EventRegistry
 	decoder     Decoder
+	store       Store
 	dispatcher  appevent.Dispatcher
 	concurrency int
 }
 
 func NewRelay(
-	store Store,
+	registry EventRegistry,
 	decoder Decoder,
+	store Store,
 	dispatcher appevent.Dispatcher,
 	concurrency int,
 ) *Relay {
 	return &Relay{
-		store:       store,
+		registry:    registry,
 		decoder:     decoder,
+		store:       store,
 		dispatcher:  dispatcher,
 		concurrency: concurrency,
 	}
@@ -49,22 +52,18 @@ func (r *Relay) ProcessBatch(ctx context.Context, limit int) error {
 }
 
 func (r *Relay) processMessage(ctx context.Context, message Message) error {
-	event, err := r.decoder.Decode(message.EventType, message.Payload)
+	event, err := r.registry.Get(message.EventType)
 
 	if err != nil {
-		if markFailedErr := r.store.MarkFailed(ctx, message); markFailedErr != nil {
-			return markFailedErr
-		}
+		return r.store.MarkFailed(ctx, message)
+	}
 
-		return nil
+	if decodeErr := r.decoder.Decode(message.Payload, event); decodeErr != nil {
+		return r.store.MarkFailed(ctx, message)
 	}
 
 	if err := r.dispatcher.Dispatch(ctx, event); err != nil {
-		if markFailedErr := r.store.MarkFailed(ctx, message); markFailedErr != nil {
-			return markFailedErr
-		}
-
-		return nil
+		return r.store.MarkFailed(ctx, message)
 	}
 
 	if markProcessedErr := r.store.MarkProcessed(ctx, message); markProcessedErr != nil {
