@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/codememory1/d8r/internal/infrastructure/config"
 	"github.com/codememory1/d8r/pkg/postgres"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -17,13 +16,15 @@ const (
 	transactionContextKey contextKey = "transaction"
 )
 
+// ConnectionPool wraps a PostgreSQL connection pool and provides
+// transaction-aware query execution.
 type ConnectionPool struct {
 	pool *pgxpool.Pool
 }
 
 // NewConnectionPool creates a new connection pool and performs a ping.
-func NewConnectionPool(ctx context.Context, config config.Postgres) (*ConnectionPool, error) {
-	poolConfig, err := pgxpool.ParseConfig(buildConnectionString(config))
+func NewConnectionPool(ctx context.Context, options Options) (*ConnectionPool, error) {
+	poolConfig, err := pgxpool.ParseConfig(buildConnectionString(options))
 
 	if err != nil {
 		return nil, err
@@ -87,13 +88,13 @@ func (p *ConnectionPool) executor(ctx context.Context) postgres.Executor {
 }
 
 // buildConnectionString constructs a PostgreSQL connection URL from the configuration.
-func buildConnectionString(config config.Postgres) string {
+func buildConnectionString(options Options) string {
 	return fmt.Sprintf(
 		"postgres://%s:%s@%s:%d/%s",
-		config.User,
-		config.Password,
-		config.Host,
-		config.Port,
-		config.Database,
+		options.User,
+		options.Password,
+		options.Host,
+		options.Port,
+		options.Database,
 	)
 }

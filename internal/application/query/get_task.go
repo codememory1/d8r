@@ -2,12 +2,10 @@ package query
 
 import (
 	"context"
+	"time"
 
-	"github.com/codememory1/d8r/internal/domain/repository"
 	"github.com/codememory1/d8r/internal/domain/valueobject"
 	"github.com/codememory1/d8r/pkg/cqrs"
-	"github.com/codememory1/d8r/pkg/optional"
-	"github.com/codememory1/d8r/pkg/timeutil"
 )
 
 // Ensure GetTaskHandler implements the expected query handler contract.
@@ -20,43 +18,44 @@ type GetTask struct {
 
 // GetTaskResult contains the task data returned by GetTaskHandler.
 type GetTaskResult struct {
-	ID        string            `json:"id"`
-	URL       string            `json:"url"`
-	Headers   map[string]string `json:"headers"`
-	Filename  *string           `json:"filename"`
-	Priority  int               `json:"priority"`
-	Status    string            `json:"status"`
-	CreatedAt int64             `json:"created_at"`
-	UpdatedAt *int64            `json:"updated_at"`
+	ID        string
+	URL       string
+	Headers   map[string]string
+	Filename  *string
+	Priority  int
+	Status    string
+	CreatedAt time.Time
+	UpdatedAt *time.Time
 }
 
 // GetTaskHandler handles queries for retrieving a task by its identifier.
 type GetTaskHandler struct {
-	taskRepository repository.TaskRepository
+	taskReader TaskReader
 }
 
 // NewGetTaskHandler creates a handler for task retrieval queries.
-func NewGetTaskHandler(taskRepository repository.TaskRepository) *GetTaskHandler {
+func NewGetTaskHandler(taskReader TaskReader) *GetTaskHandler {
 	return &GetTaskHandler{
-		taskRepository: taskRepository,
+		taskReader: taskReader,
 	}
 }
 
 // Handle retrieves a task and converts it into a query result.
-func (h *GetTaskHandler) Handle(ctx context.Context, query GetTask) (GetTaskResult, error) {
-	task, err := h.taskRepository.GetById(ctx, query.ID)
+func (h *GetTaskHandler) Handle(ctx context.Context, q GetTask) (GetTaskResult, error) {
+	task, err := h.taskReader.GetByID(ctx, q.ID)
 
 	if err != nil {
 		return GetTaskResult{}, err
 	}
 
 	return GetTaskResult{
-		ID:        task.ID().String(),
-		URL:       task.URL().String(),
-		Headers:   task.Headers().Map(),
-		Filename:  optional.Map(task.Filename(), valueobject.Filename.String),
-		Status:    string(task.Status()),
-		CreatedAt: task.CreatedAt().Unix(),
-		UpdatedAt: timeutil.UnixTimestamp(task.UpdatedAt()),
+		ID:        task.ID,
+		URL:       task.URL,
+		Headers:   task.Headers,
+		Filename:  task.Filename,
+		Priority:  task.Priority,
+		Status:    task.Status,
+		CreatedAt: task.CreatedAt,
+		UpdatedAt: task.UpdatedAt,
 	}, nil
 }

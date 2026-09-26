@@ -2,7 +2,8 @@ package request
 
 import (
 	"github.com/codememory1/d8r/internal/application/query"
-	"github.com/codememory1/d8r/pkg/pagination"
+	httppagination "github.com/codememory1/d8r/internal/presentation/http/pagination"
+	corepagination "github.com/codememory1/d8r/pkg/pagination"
 	"github.com/codememory1/d8r/pkg/restful"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 )
@@ -33,7 +34,7 @@ func (r ListTasks) Validate() error {
 
 // ToQuery converts HTTP query parameters into an application query.
 func (r ListTasks) ToQuery() (query.ListTasks, error) {
-	var cursor *pagination.Cursor
+	var cursor *corepagination.Cursor
 
 	// Resolve the page size, falling back to the default when omitted.
 	limit := listTasksDefaultLimit
@@ -44,7 +45,7 @@ func (r ListTasks) ToQuery() (query.ListTasks, error) {
 
 	// Decode the opaque cursor when pagination continues from a previous page.
 	if r.Cursor != nil {
-		decodedCursor, err := pagination.DecodeCursor(*r.Cursor)
+		decodedCursor, err := httppagination.Decode(*r.Cursor)
 
 		if err != nil {
 			return query.ListTasks{}, restful.NewError(400, "invalid cursor", err)

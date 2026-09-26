@@ -9,7 +9,7 @@ import (
 )
 
 // buildResult converts inspected HTTP responses into a validated application
-// result and determines the appropriate httpdownload strategy.
+// result and determines the appropriate download strategy.
 func (i *HttpInspector) buildResult(headResponse, probeRangeResponse *http.Response) (inspect.Result, error) {
 	rawEffectiveURL := resolveEffectiveURL(probeRangeResponse, headResponse)
 	effectiveURL, err := valueobject.NewURL(rawEffectiveURL)
@@ -68,12 +68,12 @@ func (i *HttpInspector) buildResult(headResponse, probeRangeResponse *http.Respo
 	contentEncoding := resolveContentEncoding(headResponse, probeRangeResponse)
 
 	return inspect.Result{
-		EffectiveURL:     effectiveURL,
-		ContentType:      contentType,
-		Filename:         filename,
-		Size:             byteSize,
-		DownloadStrategy: i.resolveStrategy(totalSize, rangeSupport, contentEncoding),
-		ETag:             resolveETag(probeRangeResponse, headResponse),
-		LastModified:     resolveLastModified(probeRangeResponse, headResponse),
+		EffectiveURL:             effectiveURL,
+		ContentType:              contentType,
+		Filename:                 filename,
+		Size:                     byteSize,
+		SupportsParallelDownload: resolveSupportsParallel(rangeSupport, contentEncoding),
+		ETag:                     resolveETag(probeRangeResponse, headResponse),
+		LastModified:             resolveLastModified(probeRangeResponse, headResponse),
 	}, nil
 }

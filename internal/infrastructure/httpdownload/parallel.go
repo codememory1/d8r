@@ -5,11 +5,11 @@ import (
 	"net/http"
 
 	"github.com/codememory1/d8r/internal/application/download"
-	"github.com/codememory1/d8r/internal/application/storage"
+	"github.com/codememory1/d8r/internal/infrastructure/storage"
 	"golang.org/x/sync/errgroup"
 )
 
-// downloadParallel Performs a parallel httpdownload of a resource by splitting it into ranges
+// downloadParallel Performs a parallel download of a resource by splitting it into ranges
 // and downloading them simultaneously, subject to a limit on the number
 // of parallel requests.
 func (d *HttpDownloader) downloadParallel(ctx context.Context, options download.Options) error {
@@ -19,8 +19,8 @@ func (d *HttpDownloader) downloadParallel(ctx context.Context, options download.
 	writer, err := d.storage.CreateWriter(
 		ctx,
 		filename,
-		d.config.BufferSize.Bytes(),
-		new(options.InspectionResult.Size.Int64()),
+		d.options.BufferSize,
+		new(options.Size.Int64()),
 	)
 
 	if err != nil {
@@ -31,18 +31,18 @@ func (d *HttpDownloader) downloadParallel(ctx context.Context, options download.
 
 	g, ctx := errgroup.WithContext(ctx)
 
-	g.SetLimit(d.config.MaxParallelParts)
+	g.SetLimit(d.options.MaxParallelParts)
 
-	for i := 0; i < d.config.RangeParts; i++ {
+	for i := 0; i < d.options.RangeParts; i++ {
 		// Calculates the HTTP byte range for a specific part.
-		httpRange, err := ResolveHTTPRange(options.InspectionResult.Size.Int64(), i, d.config.RangeParts)
+		httpRange, err := ResolveHTTPRange(options.Size.Int64(), i, d.options.RangeParts)
 
 		if err != nil {
 			return err
 		}
 
 		g.Go(func() error {
-			return d.downloadPart(ctx, options.InspectionResult.EffectiveURL.String(), writer, httpRange)
+			return d.downloadPart(ctx, options.URL.String(), writer, httpRange)
 		})
 	}
 

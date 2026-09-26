@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/codememory1/d8r/internal/application/storage"
+	"github.com/codememory1/d8r/internal/infrastructure/storage"
 )
 
+// Storage stores downloaded resources in a local filesystem directory.
 type Storage struct {
 	directory string
 }

@@ -5,11 +5,13 @@ import (
 	"fmt"
 )
 
+// HTTPRange represents an inclusive HTTP byte range.
 type HTTPRange struct {
 	Start int64
 	End   int64
 }
 
+// NewHTTPRange creates an inclusive HTTP byte range from the provided offsets.
 func NewHTTPRange(start int64, end int64) HTTPRange {
 	return HTTPRange{start, end}
 }

@@ -2,13 +2,27 @@ package entity
 
 import (
 	"errors"
+	"fmt"
+	"maps"
 	"time"
 
 	"github.com/codememory1/d8r/internal/domain/valueobject"
+	"github.com/codememory1/d8r/pkg/statemachine"
 )
+
+// WebhookTransition represents a named webhook state transition.
+type WebhookTransition string
 
 // WebhookStatus represents the operational state of a webhook.
 type WebhookStatus string
+
+const (
+	// WebhookTransitionEnable enable webhook.
+	WebhookTransitionEnable WebhookTransition = "enable"
+
+	// WebhookTransitionDisable disable webhook.
+	WebhookTransitionDisable WebhookTransition = "disable"
+)
 
 const (
 	// WebhookStatusEnabled indicates that the webhook can receive events.
@@ -16,6 +30,24 @@ const (
 
 	// WebhookStatusDisabled indicates that event delivery is disabled.
 	WebhookStatusDisabled WebhookStatus = "disabled"
+)
+
+// webhookStateMachine defines allowed webhook status transitions.
+var webhookStateMachine = statemachine.NewMachine(
+	statemachine.T(
+		WebhookTransitionEnable,
+		[]WebhookStatus{
+			WebhookStatusDisabled,
+		},
+		WebhookStatusEnabled,
+	),
+	statemachine.T(
+		WebhookTransitionDisable,
+		[]WebhookStatus{
+			WebhookStatusEnabled,
+		},
+		WebhookStatusDisabled,
+	),
 )
 
 var (
@@ -26,6 +58,10 @@ var (
 	// ErrWebhookUnsubscribed is returned when the requested subscription
 	// does not exist.
 	ErrWebhookUnsubscribed = errors.New("webhook subscription not found")
+
+	// ErrInvalidWebhookStatus is returned when a webhook status cannot be
+	// recognized.
+	ErrInvalidWebhookStatus = errors.New("invalid webhook status")
 )
 
 // Webhook is an aggregate root that represents an HTTP endpoint and its
@@ -69,18 +105,32 @@ func UnmarshalWebhook(
 	id valueobject.ID,
 	url valueobject.URL,
 	headers valueobject.Headers,
-	status WebhookStatus,
+	status string,
+	subscriptions map[valueobject.WebhookEventType]WebhookSubscription,
 	createdAt time.Time,
 	updatedAt *time.Time,
-) *Webhook {
-	return &Webhook{
-		id:        id,
-		url:       url,
-		headers:   headers,
-		status:    status,
-		createdAt: createdAt,
-		updatedAt: updatedAt,
+) (*Webhook, error) {
+	webhookStatus, err := ParseWebhookStatus(status)
+
+	if err != nil {
+		return nil, err
 	}
+
+	clonedSubscriptions := maps.Clone(subscriptions)
+
+	if clonedSubscriptions == nil {
+		clonedSubscriptions = make(map[valueobject.WebhookEventType]WebhookSubscription)
+	}
+
+	return &Webhook{
+		id:            id,
+		url:           url,
+		headers:       headers,
+		status:        webhookStatus,
+		subscriptions: clonedSubscriptions,
+		createdAt:     createdAt,
+		updatedAt:     updatedAt,
+	}, nil
 }
 
 // ID returns the webhook identifier.
@@ -105,7 +155,7 @@ func (w *Webhook) Status() WebhookStatus {
 
 // Subscriptions returns the webhook's event subscriptions.
 func (w *Webhook) Subscriptions() map[valueobject.WebhookEventType]WebhookSubscription {
-	return w.subscriptions
+	return maps.Clone(w.subscriptions)
 }
 
 // CreatedAt returns the time when the webhook was created.
@@ -148,11 +198,39 @@ func (w *Webhook) Supports(eventType valueobject.WebhookEventType) bool {
 }
 
 // Enable enables event delivery to the webhook.
-func (w *Webhook) Enable() {
-	w.status = WebhookStatusEnabled
+func (w *Webhook) Enable() error {
+	return w.transition(WebhookTransitionEnable)
 }
 
 // Disable disables event delivery to the webhook.
-func (w *Webhook) Disable() {
-	w.status = WebhookStatusDisabled
+func (w *Webhook) Disable() error {
+	return w.transition(WebhookTransitionDisable)
+}
+
+// transition applies the named state transition to the webhook.
+func (w *Webhook) transition(name WebhookTransition) error {
+	newStatus, err := webhookStateMachine.Transition(name, w.status)
+
+	if err != nil {
+		return err
+	}
+
+	w.status = newStatus
+	w.updatedAt = new(time.Now())
+
+	return nil
+}
+
+// ParseWebhookStatus parses and validates a webhook status from its string
+// representation.
+func ParseWebhookStatus(value string) (WebhookStatus, error) {
+	status := WebhookStatus(value)
+
+	switch status {
+	case WebhookStatusEnabled,
+		WebhookStatusDisabled:
+		return status, nil
+	default:
+		return "", fmt.Errorf("%w: %q", ErrInvalidWebhookStatus, value)
+	}
 }

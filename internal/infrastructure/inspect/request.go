@@ -21,7 +21,7 @@ func (i *HttpInspector) createRequest(
 	}
 
 	for k, v := range headers {
-		if slices.Contains(i.reservedHeaders, k) {
+		if slices.Contains(i.options.ReservedHeaders, k) {
 			continue
 		}
 

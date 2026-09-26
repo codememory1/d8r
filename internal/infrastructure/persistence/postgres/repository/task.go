@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
@@ -10,8 +11,8 @@ import (
 	"github.com/codememory1/d8r/internal/domain/valueobject"
 	"github.com/codememory1/d8r/internal/infrastructure/persistence/postgres"
 	"github.com/codememory1/d8r/pkg/optional"
-	"github.com/codememory1/d8r/pkg/pagination"
 	"github.com/georgysavva/scany/v2/pgxscan"
+	"github.com/jackc/pgx/v5"
 )
 
 const taskClaimByStatusSQL = `
@@ -32,7 +33,7 @@ const taskClaimByStatusSQL = `
 		updated_at = NOW()
 	FROM filtered_tasks
 	WHERE tasks.id = filtered_tasks.id
-	RETURNING tasks.*
+	RETURNING tasks.id
 `
 
 // taskModel represents the persistence model of a task stored in PostgreSQL.
@@ -58,56 +59,8 @@ func NewTaskRepository(pool *postgres.ConnectionPool) *TaskRepository {
 	return &TaskRepository{connection: pool}
 }
 
-// GetAllPaginated returns tasks using cursor-based keyset pagination.
-func (r *TaskRepository) GetAllPaginated(ctx context.Context, cursor *pagination.Cursor, limit int) ([]*entity.Task, error) {
-	// Build a deterministic ordering that matches the cursor fields.
-	builder := sq.
-		Select("*").
-		From("tasks").
-		Limit(uint64(limit)).
-		OrderBy("created_at DESC", "id DESC").
-		PlaceholderFormat(sq.Dollar)
-
-	// Continue from the item represented by the cursor when provided.
-	if cursor != nil {
-		builder = builder.Where(sq.Expr(
-			"(created_at, id) < (?, ?)",
-			time.UnixMicro(cursor.Timestamp),
-			cursor.LastID,
-		))
-	}
-
-	sql, args, err := builder.ToSql()
-
-	if err != nil {
-		return nil, err
-	}
-
-	var models []taskModel
-
-	// Load persistence models from PostgreSQL.
-	if err := pgxscan.Select(ctx, r.connection, &models, sql, args...); err != nil {
-		return nil, err
-	}
-
-	// Rehydrate domain entities from persistence models.
-	entities := make([]*entity.Task, len(models))
-
-	for i, model := range models {
-		e, err := model.toDomainEntity()
-
-		if err != nil {
-			return nil, err
-		}
-
-		entities[i] = e
-	}
-
-	return entities, nil
-}
-
-// GetById returns a task by its identifier.
-func (r *TaskRepository) GetById(ctx context.Context, id valueobject.ID) (*entity.Task, error) {
+// GetByID returns a task by its identifier.
+func (r *TaskRepository) GetByID(ctx context.Context, id valueobject.ID) (*entity.Task, error) {
 	sql, args, err := sq.
 		Select("*").
 		From("tasks").
@@ -123,9 +76,14 @@ func (r *TaskRepository) GetById(ctx context.Context, id valueobject.ID) (*entit
 
 	var model taskModel
 
-	// Load the persistence model matching the requested identifier.
-	if pgxscan.Get(ctx, r.connection, &model, sql, args...) != nil {
+	err = pgxscan.Get(ctx, r.connection, &model, sql, args...)
+
+	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, repository.ErrNotFound
+	}
+
+	if err != nil {
+		return nil, err
 	}
 
 	return model.toDomainEntity()
@@ -133,7 +91,7 @@ func (r *TaskRepository) GetById(ctx context.Context, id valueobject.ID) (*entit
 
 // ClaimReadyToDownload atomically claims tasks that are ready to be downloaded
 // and transitions them to the downloading state.
-func (r *TaskRepository) ClaimReadyToDownload(ctx context.Context, limit int) ([]*entity.Task, error) {
+func (r *TaskRepository) ClaimReadyToDownload(ctx context.Context, limit int) ([]valueobject.ID, error) {
 	var models []taskModel
 
 	err := pgxscan.Select(ctx, r.connection, &models, taskClaimByStatusSQL, []any{
@@ -146,24 +104,24 @@ func (r *TaskRepository) ClaimReadyToDownload(ctx context.Context, limit int) ([
 		return nil, err
 	}
 
-	entities := make([]*entity.Task, len(models))
+	ids := make([]valueobject.ID, len(models))
 
 	for i, model := range models {
-		e, err := model.toDomainEntity()
+		id, err := valueobject.ParseID(model.ID)
 
 		if err != nil {
 			return nil, err
 		}
 
-		entities[i] = e
+		ids[i] = id
 	}
 
-	return entities, nil
+	return ids, nil
 }
 
 // ClaimPending atomically claims pending tasks for inspection
 // and transitions them to the inspecting state.
-func (r *TaskRepository) ClaimPending(ctx context.Context, limit int) ([]*entity.Task, error) {
+func (r *TaskRepository) ClaimPending(ctx context.Context, limit int) ([]valueobject.ID, error) {
 	var models []taskModel
 
 	err := pgxscan.Select(ctx, r.connection, &models, taskClaimByStatusSQL, []any{
@@ -176,19 +134,19 @@ func (r *TaskRepository) ClaimPending(ctx context.Context, limit int) ([]*entity
 		return nil, err
 	}
 
-	entities := make([]*entity.Task, len(models))
+	ids := make([]valueobject.ID, len(models))
 
 	for i, model := range models {
-		e, err := model.toDomainEntity()
+		id, err := valueobject.ParseID(model.ID)
 
 		if err != nil {
 			return nil, err
 		}
 
-		entities[i] = e
+		ids[i] = id
 	}
 
-	return entities, nil
+	return ids, nil
 }
 
 // Save persists a task entity in PostgreSQL.
@@ -312,5 +270,5 @@ func (m taskModel) toDomainEntity() (*entity.Task, error) {
 		m.Version,
 		m.CreatedAt,
 		m.UpdatedAt,
-	), nil
+	)
 }

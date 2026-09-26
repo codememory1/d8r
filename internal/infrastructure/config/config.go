@@ -9,14 +9,16 @@ import (
 	"github.com/goccy/go-yaml"
 )
 
+// Config contains all application configuration sections.
 type Config struct {
 	HTTP     HTTP          `yaml:"http"`
 	Postgres Postgres      `yaml:"postgres"`
-	Download Download      `yaml:"httpdownload"`
+	Download Download      `yaml:"download"`
 	Workers  Workers       `yaml:"workers"`
 	Webhook  WebhookConfig `yaml:"webhook"`
 }
 
+// HTTP contains the HTTP server configuration.
 type HTTP struct {
 	Address      string        `yaml:"address"`
 	Port         uint32        `yaml:"port"`
@@ -25,6 +27,7 @@ type HTTP struct {
 	IdleTimeout  time.Duration `yaml:"idle_timeout"`
 }
 
+// Postgres contains the PostgreSQL connection configuration.
 type Postgres struct {
 	Host     string `yaml:"host"`
 	Port     uint16 `yaml:"port"`
@@ -33,6 +36,7 @@ type Postgres struct {
 	Database string `yaml:"database"`
 }
 
+// Download contains resource inspection and downloading configuration.
 type Download struct {
 	MinParallelSize  ByteSize `yaml:"min_parallel_size"`
 	BufferSize       ByteSize `yaml:"buffer_size"`
@@ -41,19 +45,32 @@ type Download struct {
 	RangeParts       int      `yaml:"range_parts"`
 }
 
+// Workers contains configuration for all background workers.
 type Workers struct {
-	Download   DownloadWorker   `yaml:"download"`
-	Inspection InspectionWorker `yaml:"inspection"`
+	Download    DownloadWorker    `yaml:"download"`
+	Inspection  InspectionWorker  `yaml:"inspection"`
+	OutboxEvent OutboxEventWorker `yaml:"outbox_event"`
 }
 
+// DownloadWorker contains download-worker concurrency and batch settings.
 type DownloadWorker struct {
-	Concurrency uint64 `yaml:"concurrency"`
+	Concurrency int `yaml:"concurrency"`
+	Limit       int `yaml:"limit"`
 }
 
+// InspectionWorker contains inspection-worker concurrency and batch settings.
 type InspectionWorker struct {
-	Concurrency uint64 `yaml:"concurrency"`
+	Concurrency int `yaml:"concurrency"`
+	Limit       int `yaml:"limit"`
 }
 
+// OutboxEventWorker contains outbox-worker concurrency and batch settings.
+type OutboxEventWorker struct {
+	Concurrency int `yaml:"concurrency"`
+	Limit       int `yaml:"limit"`
+}
+
+// WebhookConfig contains webhook delivery and retry settings.
 type WebhookConfig struct {
 	Concurrency    uint64        `yaml:"concurrency"`
 	RequestTimeout time.Duration `yaml:"request_timeout"`
@@ -61,6 +78,7 @@ type WebhookConfig struct {
 	RetryDelay     time.Duration `yaml:"retry_delay"`
 }
 
+// defaults returns the application configuration populated with default values.
 func defaults() Config {
 	return Config{
 		HTTP: HTTP{
@@ -87,9 +105,15 @@ func defaults() Config {
 		Workers: Workers{
 			DownloadWorker{
 				Concurrency: 5,
+				Limit:       20,
 			},
 			InspectionWorker{
 				Concurrency: 5,
+				Limit:       20,
+			},
+			OutboxEventWorker{
+				Concurrency: 5,
+				Limit:       20,
 			},
 		},
 		Webhook: WebhookConfig{
@@ -172,7 +196,7 @@ func (c Postgres) Validate() error {
 // Validate validates Download configuration parameters.
 func (c Download) Validate() error {
 	if c.MinParallelSize.Bytes() <= 0 {
-		return errors.New("httpdownload.min_parallel_size must be greater than 0")
+		return errors.New("download.min_parallel_size must be greater than 0")
 	}
 
 	return nil
@@ -188,6 +212,10 @@ func (c Workers) Validate() error {
 		return err
 	}
 
+	if err := c.OutboxEvent.Validate(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -197,6 +225,10 @@ func (c DownloadWorker) Validate() error {
 		return errors.New("workers.download.concurrency must be greater than 0")
 	}
 
+	if c.Limit <= 0 {
+		return errors.New("workers.download.limit must be greater than 0")
+	}
+
 	return nil
 }
 
@@ -204,6 +236,23 @@ func (c DownloadWorker) Validate() error {
 func (c InspectionWorker) Validate() error {
 	if c.Concurrency <= 0 {
 		return errors.New("workers.inspection.concurrency must be greater than 0")
+	}
+
+	if c.Limit <= 0 {
+		return errors.New("workers.inspection.limit must be greater than 0")
+	}
+
+	return nil
+}
+
+// Validate validates the outbox event worker parameters.
+func (c OutboxEventWorker) Validate() error {
+	if c.Concurrency <= 0 {
+		return errors.New("workers.outbox_event.concurrency must be greater than 0")
+	}
+
+	if c.Limit <= 0 {
+		return errors.New("workers.outbox_event.limit must be greater than 0")
 	}
 
 	return nil

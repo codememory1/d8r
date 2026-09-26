@@ -6,9 +6,10 @@ import (
 
 	"github.com/codememory1/d8r/internal/application/command"
 	"github.com/codememory1/d8r/internal/application/query"
-	"github.com/codememory1/d8r/internal/domain/repository"
 	"github.com/codememory1/d8r/internal/domain/valueobject"
+	httppagination "github.com/codememory1/d8r/internal/presentation/http/pagination"
 	"github.com/codememory1/d8r/internal/presentation/http/request"
+	"github.com/codememory1/d8r/internal/presentation/http/response"
 	"github.com/codememory1/d8r/pkg/cqrs"
 	"github.com/codememory1/d8r/pkg/restful"
 	"github.com/codememory1/d8r/pkg/restful/respond"
@@ -39,7 +40,7 @@ func NewTaskController(
 	}
 }
 
-// Create handles a request to create a new httpdownload task.
+// Create handles a request to create a new download task.
 func (c *TaskController) Create(w http.ResponseWriter, r *http.Request) error {
 	req, err := restful.DecodeBody[request.CreateTask](r.Body)
 
@@ -59,9 +60,11 @@ func (c *TaskController) Create(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	return c.responder.Respond(w, http.StatusCreated, respond.NewSuccessBody(map[string]any{
-		"id": id.String(),
-	}))
+	return c.responder.Respond(
+		w,
+		http.StatusCreated,
+		respond.NewSuccessBody(response.NewCreateTask(id)),
+	)
 }
 
 // Get handles a request to retrieve a task by its identifier.
@@ -78,14 +81,18 @@ func (c *TaskController) Get(w http.ResponseWriter, r *http.Request) error {
 	})
 
 	if err != nil {
-		if errors.Is(err, repository.ErrTaskNotFound) {
+		if errors.Is(err, query.ErrTaskNotFound) {
 			return restful.NewError(http.StatusNotFound, "task not found", err)
 		}
 
 		return err
 	}
 
-	return c.responder.Respond(w, http.StatusOK, respond.NewSuccessBody(result))
+	return c.responder.Respond(
+		w,
+		http.StatusOK,
+		respond.NewSuccessBody(response.FromGetTaskResult(result)),
+	)
 }
 
 // List handles a request to retrieve a collection of tasks.
@@ -108,9 +115,21 @@ func (c *TaskController) List(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
+	var nextCursor *string
+
+	if result.NextCursor != nil {
+		encodedCursor, err := httppagination.Encode(*result.NextCursor)
+
+		if err != nil {
+			return err
+		}
+
+		nextCursor = &encodedCursor
+	}
+
 	responseBody := respond.
-		NewSuccessBody(result.Items).
-		WithCursorPagination(q.Limit, result.NextCursor)
+		NewSuccessBody(response.FromTaskListItems(result.Items)).
+		WithCursorPagination(q.Limit, nextCursor)
 
 	return c.responder.Respond(w, http.StatusOK, responseBody)
 }

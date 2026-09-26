@@ -11,6 +11,7 @@ import (
 	"github.com/go-playground/form/v4"
 )
 
+// Input represents an HTTP input value that can validate itself.
 type Input interface {
 	validation.Validatable
 }
@@ -33,6 +34,8 @@ func DecodeBody[T Input](r io.Reader) (T, error) {
 	return validate(input)
 }
 
+// DecodeQuery decodes and validates HTTP query parameters into the specified
+// input type.
 func DecodeQuery[T Input](values url.Values) (T, error) {
 	var input T
 
@@ -43,6 +46,8 @@ func DecodeQuery[T Input](values url.Values) (T, error) {
 	return validate(input)
 }
 
+// validate validates a decoded input and converts validation failures into
+// client-safe HTTP errors.
 func validate[T Input](input T) (T, error) {
 	if err := input.Validate(); err != nil {
 		if validationErrors, ok := errors.AsType[validation.Errors](err); ok {

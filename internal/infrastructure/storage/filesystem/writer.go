@@ -8,8 +8,11 @@ import (
 	"os"
 )
 
+// WriterFunc writes a chunk of resource data and returns the number of bytes
+// written.
 type WriterFunc func(data []byte) (int, error)
 
+// Writer writes resource data to an open filesystem file.
 type Writer struct {
 	file       *os.File
 	bufferSize int64

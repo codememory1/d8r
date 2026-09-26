@@ -21,8 +21,7 @@ type Result struct {
 	// Size is the total resource size, when it can be determined.
 	Size *valueobject.ByteSize
 
-	// DownloadStrategy defines how the resource should be downloaded.
-	DownloadStrategy valueobject.DownloadStrategy
+	SupportsParallelDownload bool
 
 	// ETag is the entity tag returned by the server, when available.
 	ETag *string

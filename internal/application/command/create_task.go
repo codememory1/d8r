@@ -3,6 +3,8 @@ package command
 import (
 	"context"
 
+	appevent "github.com/codememory1/d8r/internal/application/event"
+	"github.com/codememory1/d8r/internal/application/transaction"
 	"github.com/codememory1/d8r/internal/domain/entity"
 	"github.com/codememory1/d8r/internal/domain/repository"
 	"github.com/codememory1/d8r/internal/domain/valueobject"
@@ -22,12 +24,20 @@ type CreateTask struct {
 
 // CreateTaskHandler handles task creation commands.
 type CreateTaskHandler struct {
+	tm             transaction.Manager
+	eventPublisher appevent.Publisher
 	taskRepository repository.TaskRepository
 }
 
 // NewCreateTaskHandler creates a handler for task creation commands.
-func NewCreateTaskHandler(taskRepository repository.TaskRepository) *CreateTaskHandler {
+func NewCreateTaskHandler(
+	tm transaction.Manager,
+	eventPublisher appevent.Publisher,
+	taskRepository repository.TaskRepository,
+) *CreateTaskHandler {
 	return &CreateTaskHandler{
+		tm:             tm,
+		eventPublisher: eventPublisher,
 		taskRepository: taskRepository,
 	}
 }
@@ -40,9 +50,24 @@ func (h *CreateTaskHandler) Handle(ctx context.Context, cmd CreateTask) (valueob
 		cmd.Filename,
 		cmd.Priority,
 	)
+	events := task.PullEvents()
 
-	if err := h.taskRepository.Save(ctx, task); err != nil {
-		return task.ID(), err
+	err := h.tm.Run(ctx, func(ctx context.Context) error {
+		if err := h.taskRepository.Save(ctx, task); err != nil {
+			return err
+		}
+
+		for _, event := range events {
+			if err := h.eventPublisher.Publish(ctx, event); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return valueobject.ID{}, err
 	}
 
 	return task.ID(), nil

@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
@@ -11,6 +12,7 @@ import (
 	"github.com/codememory1/d8r/internal/infrastructure/persistence/postgres"
 	"github.com/codememory1/d8r/pkg/optional"
 	"github.com/georgysavva/scany/v2/pgxscan"
+	"github.com/jackc/pgx/v5"
 )
 
 // taskInspectionModel represents the database model of a task inspection.
@@ -58,8 +60,14 @@ func (r *TaskInspectionRepository) GetLastByTaskID(ctx context.Context, id value
 
 	var model taskInspectionModel
 
-	if pgxscan.Get(ctx, r.connection, &model, sql, args...) != nil {
+	err = pgxscan.Get(ctx, r.connection, &model, sql, args...)
+
+	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, repository.ErrNotFound
+	}
+
+	if err != nil {
+		return nil, err
 	}
 
 	return model.toDomainEntity()
