@@ -6,6 +6,7 @@ import (
 	"github.com/codememory1/d8r/pkg/timeutil"
 )
 
+// Task represents task data returned by the HTTP API.
 type Task struct {
 	ID        string            `json:"id"`
 	URL       string            `json:"url"`
@@ -17,16 +18,20 @@ type Task struct {
 	UpdatedAt *int64            `json:"updated_at"`
 }
 
+// CreateTask represents the response returned after creating a task.
 type CreateTask struct {
 	ID string `json:"id"`
 }
 
+// NewCreateTask creates a task-creation response from a task identifier.
 func NewCreateTask(id valueobject.ID) CreateTask {
 	return CreateTask{
 		ID: id.String(),
 	}
 }
 
+// FromGetTaskResult converts an application query result into an HTTP task
+// response.
 func FromGetTaskResult(result query.GetTaskResult) Task {
 	return Task{
 		ID:        result.ID,
@@ -40,6 +45,8 @@ func FromGetTaskResult(result query.GetTaskResult) Task {
 	}
 }
 
+// FromTaskListItems converts application task-list items into HTTP task
+// responses.
 func FromTaskListItems(items []query.TaskListItem) []Task {
 	result := make([]Task, len(items))
 

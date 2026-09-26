@@ -28,6 +28,8 @@ func NewOutboxEventWorker(logger *slog.Logger, relay OutboxRelay, limit int) *Ou
 	}
 }
 
+// Run continuously processes batches of pending outbox events until the
+// context is canceled.
 func (w *OutboxEventWorker) Run(ctx context.Context) error {
 	timer := time.NewTimer(1 * time.Second)
 	defer timer.Stop()

@@ -9,6 +9,7 @@ import (
 )
 
 var (
+	// ErrEmptyCursor is returned when an empty pagination cursor is provided.
 	ErrEmptyCursor = errors.New("cursor is empty")
 	base64Encoding = base64.RawURLEncoding.Strict()
 )
@@ -18,6 +19,7 @@ type cursorPayload struct {
 	Timestamp int64  `json:"timestamp"`
 }
 
+// Encode serializes a pagination cursor into an opaque URL-safe string.
 func Encode(cursor corepagination.Cursor) (string, error) {
 	payload, err := json.Marshal(cursorPayload{
 		LastID:    cursor.LastID,
@@ -31,6 +33,7 @@ func Encode(cursor corepagination.Cursor) (string, error) {
 	return base64Encoding.EncodeToString(payload), nil
 }
 
+// Decode restores a pagination cursor from an opaque URL-safe string.
 func Decode(raw string) (corepagination.Cursor, error) {
 	if raw == "" {
 		return corepagination.Cursor{}, ErrEmptyCursor

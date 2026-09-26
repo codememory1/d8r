@@ -28,16 +28,20 @@ type taskRow struct {
 	UpdatedAt *time.Time        `db:"updated_at"`
 }
 
+// TaskReader provides PostgreSQL-backed read access to task projections.
 type TaskReader struct {
 	connection *postgres.ConnectionPool
 }
 
+// NewTaskReader creates a PostgreSQL-backed task reader.
 func NewTaskReader(connection *postgres.ConnectionPool) *TaskReader {
 	return &TaskReader{
 		connection: connection,
 	}
 }
 
+// GetAllPaginated returns a page of tasks ordered by creation time and
+// identifier.
 func (r *TaskReader) GetAllPaginated(ctx context.Context, cursor *pagination.Cursor, limit int) ([]query.TaskReadModel, error) {
 	// Build a deterministic ordering that matches the cursor fields.
 	builder := sq.
@@ -79,6 +83,7 @@ func (r *TaskReader) GetAllPaginated(ctx context.Context, cursor *pagination.Cur
 	return readModels, nil
 }
 
+// GetByID returns the task projection associated with the specified identifier.
 func (r *TaskReader) GetByID(ctx context.Context, id valueobject.ID) (query.TaskReadModel, error) {
 	sql, args, err := sq.
 		Select("*").

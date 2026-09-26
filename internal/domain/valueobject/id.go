@@ -8,14 +8,17 @@ import (
 
 var _ ddd.ValueObject[ID] = ID{}
 
+// ID represents a non-empty UUID identifier.
 type ID struct {
 	value uuid.UUID
 }
 
+// NewID generates a new random identifier.
 func NewID() ID {
 	return ID{uuid.New()}
 }
 
+// ParseID parses and validates an identifier from its string representation.
 func ParseID(value string) (ID, error) {
 	parsedUUID, err := uuid.Parse(value)
 
@@ -30,14 +33,17 @@ func ParseID(value string) (ID, error) {
 	return ID{parsedUUID}, nil
 }
 
+// Equal reports whether two identifiers are equal.
 func (v ID) Equal(other ID) bool {
 	return v.value == other.value
 }
 
+// UUID returns the underlying UUID value.
 func (v ID) UUID() uuid.UUID {
 	return v.value
 }
 
+// String returns the canonical string representation of the identifier.
 func (v ID) String() string {
 	return v.value.String()
 }

@@ -16,6 +16,8 @@ const (
 	transactionContextKey contextKey = "transaction"
 )
 
+// ConnectionPool wraps a PostgreSQL connection pool and provides
+// transaction-aware query execution.
 type ConnectionPool struct {
 	pool *pgxpool.Pool
 }

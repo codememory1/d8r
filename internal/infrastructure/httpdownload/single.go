@@ -7,6 +7,8 @@ import (
 	"github.com/codememory1/d8r/internal/application/download"
 )
 
+// downloadSequential downloads the entire resource using a single HTTP request
+// and writes it to storage sequentially.
 func (d *HttpDownloader) downloadSequential(ctx context.Context, options download.Options) error {
 	filename := d.resolveFilename(options)
 

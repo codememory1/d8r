@@ -15,11 +15,13 @@ import (
 
 var _ appevent.Publisher = (*Publisher)(nil)
 
+// Publisher persists domain events in the PostgreSQL outbox.
 type Publisher struct {
 	connection *postgres.ConnectionPool
 	encoder    infraoutbox.Encoder
 }
 
+// NewPublisher creates a PostgreSQL-backed outbox event publisher.
 func NewPublisher(
 	connection *postgres.ConnectionPool,
 	encoder infraoutbox.Encoder,
@@ -30,6 +32,7 @@ func NewPublisher(
 	}
 }
 
+// Publish serializes and stores a domain event as a pending outbox message.
 func (p *Publisher) Publish(ctx context.Context, event ddd.Event) error {
 	payload, err := p.encoder.Encode(event)
 

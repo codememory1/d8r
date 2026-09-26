@@ -59,6 +59,8 @@ var (
 	// does not exist.
 	ErrWebhookUnsubscribed = errors.New("webhook subscription not found")
 
+	// ErrInvalidWebhookStatus is returned when a webhook status cannot be
+	// recognized.
 	ErrInvalidWebhookStatus = errors.New("invalid webhook status")
 )
 
@@ -219,6 +221,8 @@ func (w *Webhook) transition(name WebhookTransition) error {
 	return nil
 }
 
+// ParseWebhookStatus parses and validates a webhook status from its string
+// representation.
 func ParseWebhookStatus(value string) (WebhookStatus, error) {
 	status := WebhookStatus(value)
 

@@ -95,6 +95,7 @@ var taskStateMachine = statemachine.NewMachine(
 )
 
 var (
+	// ErrInvalidTaskStatus is returned when a task status cannot be recognized.
 	ErrInvalidTaskStatus = errors.New("invalid task status")
 )
 
@@ -247,6 +248,8 @@ func (t *Task) transition(name TaskTransition) error {
 	return nil
 }
 
+// ParseTaskStatus parses and validates a task status from its string
+// representation.
 func ParseTaskStatus(value string) (TaskStatus, error) {
 	status := TaskStatus(value)
 

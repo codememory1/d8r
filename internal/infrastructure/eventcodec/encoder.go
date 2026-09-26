@@ -6,8 +6,10 @@ import (
 	"github.com/codememory1/d8r/pkg/ddd"
 )
 
+// Encoder serializes domain events for persistence or transport.
 type Encoder struct{}
 
+// NewEncoder creates an event payload encoder.
 func NewEncoder() *Encoder {
 	return &Encoder{}
 }

@@ -16,6 +16,8 @@ type DownloadTaskWorker struct {
 	limit                      int
 }
 
+// NewDownloadTaskWorker creates a worker that periodically processes tasks
+// ready for downloading.
 func NewDownloadTaskWorker(
 	logger *slog.Logger,
 	downloadReadyTasksHandlers cqrs.CommandHandler[command.DownloadReadyTasks, struct{}],

@@ -7,6 +7,8 @@ import (
 	"github.com/codememory1/d8r/pkg/ddd"
 )
 
+// Dispatcher stores event subscriptions and dispatches events to their
+// registered handlers.
 type Dispatcher struct {
 	handlers map[ddd.EventType][]appevent.Handler
 }

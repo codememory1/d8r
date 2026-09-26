@@ -6,14 +6,19 @@ import (
 	"github.com/codememory1/d8r/pkg/ddd"
 )
 
+// ErrUnknownEventType is returned when no factory is registered for an event
+// type.
 var ErrUnknownEventType = errors.New("unknown event type")
 
+// Factory creates an empty domain event instance for decoding.
 type Factory func() ddd.Event
 
+// Registry stores factories used to reconstruct domain events by type.
 type Registry struct {
 	factories map[ddd.EventType]Factory
 }
 
+// NewRegistry creates an empty domain event registry.
 func NewRegistry() *Registry {
 	return &Registry{
 		factories: make(map[ddd.EventType]Factory),

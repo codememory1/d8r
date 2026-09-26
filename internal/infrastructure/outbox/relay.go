@@ -7,6 +7,8 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// Relay claims outbox messages, reconstructs their domain events and dispatches
+// them to registered handlers.
 type Relay struct {
 	registry    EventRegistry
 	decoder     Decoder
@@ -15,6 +17,7 @@ type Relay struct {
 	concurrency int
 }
 
+// NewRelay creates an outbox relay with bounded concurrent processing.
 func NewRelay(
 	registry EventRegistry,
 	decoder Decoder,
@@ -31,6 +34,8 @@ func NewRelay(
 	}
 }
 
+// ProcessBatch claims and processes up to the specified number of pending
+// outbox messages.
 func (r *Relay) ProcessBatch(ctx context.Context, limit int) error {
 	messages, err := r.store.ClaimPending(ctx, limit)
 
@@ -51,6 +56,8 @@ func (r *Relay) ProcessBatch(ctx context.Context, limit int) error {
 	return group.Wait()
 }
 
+// processMessage reconstructs and dispatches one outbox event, then persists
+// its final processing status.
 func (r *Relay) processMessage(ctx context.Context, message Message) error {
 	event, err := r.registry.Get(message.EventType)
 

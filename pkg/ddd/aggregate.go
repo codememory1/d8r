@@ -5,6 +5,7 @@ type AggregateVersion struct {
 	value int64
 }
 
+// AggregateRoot stores domain events raised by an aggregate.
 type AggregateRoot struct {
 	events []Event
 }
@@ -16,6 +17,7 @@ func NewAggregateVersion(value int64) AggregateVersion {
 	}
 }
 
+// NewAggregateRoot creates an aggregate root without pending events.
 func NewAggregateRoot() AggregateRoot {
 	return AggregateRoot{}
 }
@@ -30,10 +32,13 @@ func (v *AggregateVersion) IncrementVersion() {
 	v.value++
 }
 
+// Raise records a domain event produced by the aggregate.
 func (v *AggregateRoot) Raise(event Event) {
 	v.events = append(v.events, event)
 }
 
+// PullEvents returns all pending domain events and removes them from the
+// aggregate.
 func (v *AggregateRoot) PullEvents() []Event {
 	events := make([]Event, len(v.events))
 

@@ -9,16 +9,19 @@ import (
 	"github.com/codememory1/d8r/internal/infrastructure/persistence/postgres"
 )
 
+// WebhookRepository provides PostgreSQL persistence for webhook aggregates.
 type WebhookRepository struct {
 	connection *postgres.ConnectionPool
 }
 
+// NewWebhookRepository creates a PostgreSQL-backed webhook repository.
 func NewWebhookRepository(connection *postgres.ConnectionPool) *WebhookRepository {
 	return &WebhookRepository{
 		connection: connection,
 	}
 }
 
+// Save persists a webhook and all its event subscriptions atomically.
 func (r *WebhookRepository) Save(ctx context.Context, webhook *entity.Webhook) error {
 	webhookSql, webhookArgs, err := sq.
 		Insert("webhooks").

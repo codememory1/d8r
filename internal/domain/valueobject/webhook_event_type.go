@@ -10,6 +10,8 @@ import (
 var _ ddd.ValueObject[WebhookEventType] = WebhookEventType("")
 
 var (
+	// ErrInvalidWebhookEventType is returned when an unsupported webhook event
+	// type is provided.
 	ErrInvalidWebhookEventType = errors.New("invalid webhook event type")
 )
 

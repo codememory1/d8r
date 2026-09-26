@@ -34,16 +34,19 @@ const claimPendingSQL = `
         oe.version
 `
 
+// Store provides PostgreSQL persistence operations for outbox messages.
 type Store struct {
 	connection *postgres.ConnectionPool
 }
 
+// NewStore creates a PostgreSQL-backed outbox store.
 func NewStore(connection *postgres.ConnectionPool) *Store {
 	return &Store{
 		connection: connection,
 	}
 }
 
+// ClaimPending atomically claims pending outbox messages using row locking.
 func (s *Store) ClaimPending(ctx context.Context, limit int) ([]infraoutbox.Message, error) {
 	if limit <= 0 {
 		return []infraoutbox.Message{}, nil
@@ -74,6 +77,7 @@ func (s *Store) ClaimPending(ctx context.Context, limit int) ([]infraoutbox.Mess
 	return messages, nil
 }
 
+// MarkProcessed marks an outbox message as successfully processed.
 func (s *Store) MarkProcessed(ctx context.Context, message infraoutbox.Message) error {
 	return s.mark(
 		ctx,
@@ -82,6 +86,7 @@ func (s *Store) MarkProcessed(ctx context.Context, message infraoutbox.Message) 
 	)
 }
 
+// MarkFailed marks an outbox message as failed.
 func (s *Store) MarkFailed(ctx context.Context, message infraoutbox.Message) error {
 	return s.mark(
 		ctx,
@@ -90,6 +95,7 @@ func (s *Store) MarkFailed(ctx context.Context, message infraoutbox.Message) err
 	)
 }
 
+// mark updates an outbox message status using optimistic locking.
 func (s *Store) mark(ctx context.Context, message infraoutbox.Message, status infraoutbox.Status) error {
 	sql, args, err := sq.
 		Update("outbox_events").

@@ -7,17 +7,34 @@ import (
 )
 
 var (
+	// ErrInvalidContentRange is returned when a Content-Range header has an
+	// unsupported format.
 	ErrInvalidContentRange = errors.New("content range has invalid format")
-	ErrInvalidRange        = errors.New("byte range has invalid format")
 
+	// ErrInvalidRange is returned when the byte-range part has an invalid format.
+	ErrInvalidRange = errors.New("byte range has invalid format")
+
+	// ErrInvalidStart is returned when the range start cannot be parsed.
 	ErrInvalidStart = errors.New("start offset is invalid")
-	ErrInvalidEnd   = errors.New("end offset is invalid")
+
+	// ErrInvalidEnd is returned when the range end cannot be parsed.
+	ErrInvalidEnd = errors.New("end offset is invalid")
+
+	// ErrInvalidTotal is returned when the total resource size cannot be parsed.
 	ErrInvalidTotal = errors.New("total size is invalid")
 
+	// ErrNegativeStart is returned when the range start is negative.
 	ErrNegativeStart = errors.New("start offset must be non-negative")
-	ErrNegativeEnd   = errors.New("end offset must be non-negative")
 
+	// ErrNegativeEnd is returned when the range end is negative.
+	ErrNegativeEnd = errors.New("end offset must be non-negative")
+
+	// ErrInvalidRangeOrder is returned when the start offset is greater than
+	// the end offset.
 	ErrInvalidRangeOrder = errors.New("start offset cannot be greater than end offset")
+
+	// ErrRangeExceedsTotal is returned when the range extends beyond the total
+	// resource size.
 	ErrRangeExceedsTotal = errors.New("range exceeds total size")
 )
 
