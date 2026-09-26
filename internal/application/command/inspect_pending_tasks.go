@@ -15,22 +15,24 @@ type PendingTaskClaimer interface {
 }
 
 type InspectPendingTasks struct {
-	Concurrency int
-	Limit       int
+	Limit int
 }
 
 type InspectPendingTasksHandler struct {
 	taskClaimer        PendingTaskClaimer
 	inspectTaskHandler cqrs.CommandHandler[InspectTask, valueobject.ID]
+	concurrency        int
 }
 
 func NewInspectPendingTasksHandler(
 	taskClaimer PendingTaskClaimer,
 	inspectTaskHandler cqrs.CommandHandler[InspectTask, valueobject.ID],
+	concurrency int,
 ) *InspectPendingTasksHandler {
 	return &InspectPendingTasksHandler{
 		taskClaimer:        taskClaimer,
 		inspectTaskHandler: inspectTaskHandler,
+		concurrency:        concurrency,
 	}
 }
 
@@ -43,7 +45,7 @@ func (h *InspectPendingTasksHandler) Handle(ctx context.Context, cmd InspectPend
 
 	var group errgroup.Group
 
-	group.SetLimit(cmd.Concurrency)
+	group.SetLimit(h.concurrency)
 
 	for _, taskID := range taskIDs {
 		group.Go(func() error {

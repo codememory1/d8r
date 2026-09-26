@@ -15,22 +15,24 @@ type ReadyToDownloadTaskClaimer interface {
 }
 
 type DownloadReadyTasks struct {
-	Concurrency int
-	Limit       int
+	Limit int
 }
 
 type DownloadReadyTasksHandler struct {
 	taskClaimer         ReadyToDownloadTaskClaimer
 	downloadTaskHandler cqrs.CommandHandler[DownloadTask, struct{}]
+	concurrency         int
 }
 
 func NewDownloadReadyTasksHandler(
 	taskClaimer ReadyToDownloadTaskClaimer,
 	downloadTaskHandler cqrs.CommandHandler[DownloadTask, struct{}],
+	concurrency int,
 ) *DownloadReadyTasksHandler {
 	return &DownloadReadyTasksHandler{
 		taskClaimer:         taskClaimer,
 		downloadTaskHandler: downloadTaskHandler,
+		concurrency:         concurrency,
 	}
 }
 
@@ -43,7 +45,7 @@ func (h *DownloadReadyTasksHandler) Handle(ctx context.Context, cmd DownloadRead
 
 	var group errgroup.Group
 
-	group.SetLimit(cmd.Concurrency)
+	group.SetLimit(h.concurrency)
 
 	for _, taskID := range taskIDs {
 		group.Go(func() error {

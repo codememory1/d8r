@@ -13,20 +13,17 @@ import (
 type DownloadTaskWorker struct {
 	logger                     *slog.Logger
 	downloadReadyTasksHandlers cqrs.CommandHandler[command.DownloadReadyTasks, struct{}]
-	concurrency                int
 	limit                      int
 }
 
 func NewDownloadTaskWorker(
 	logger *slog.Logger,
 	downloadReadyTasksHandlers cqrs.CommandHandler[command.DownloadReadyTasks, struct{}],
-	concurrency int,
 	limit int,
 ) *DownloadTaskWorker {
 	return &DownloadTaskWorker{
 		logger:                     logger,
 		downloadReadyTasksHandlers: downloadReadyTasksHandlers,
-		concurrency:                concurrency,
 		limit:                      limit,
 	}
 }
@@ -39,8 +36,7 @@ func (w *DownloadTaskWorker) Run(ctx context.Context) error {
 
 	for {
 		_, err := w.downloadReadyTasksHandlers.Handle(ctx, command.DownloadReadyTasks{
-			Concurrency: w.concurrency,
-			Limit:       w.limit,
+			Limit: w.limit,
 		})
 
 		if err != nil {

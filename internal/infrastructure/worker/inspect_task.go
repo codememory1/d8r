@@ -13,7 +13,6 @@ import (
 type InspectTaskWorker struct {
 	logger                     *slog.Logger
 	inspectPendingTasksHandler cqrs.CommandHandler[command.InspectPendingTasks, struct{}]
-	concurrency                int
 	limit                      int
 }
 
@@ -21,13 +20,11 @@ type InspectTaskWorker struct {
 func NewInspectTaskWorker(
 	logger *slog.Logger,
 	inspectPendingTasksHandler cqrs.CommandHandler[command.InspectPendingTasks, struct{}],
-	concurrency int,
 	limit int,
 ) *InspectTaskWorker {
 	return &InspectTaskWorker{
 		logger:                     logger,
 		inspectPendingTasksHandler: inspectPendingTasksHandler,
-		concurrency:                concurrency,
 		limit:                      limit,
 	}
 }
@@ -40,8 +37,7 @@ func (w *InspectTaskWorker) Run(ctx context.Context) error {
 
 	for {
 		_, err := w.inspectPendingTasksHandler.Handle(ctx, command.InspectPendingTasks{
-			Concurrency: w.concurrency,
-			Limit:       w.limit,
+			Limit: w.limit,
 		})
 
 		if err != nil {
