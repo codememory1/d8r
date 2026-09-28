@@ -31,16 +31,17 @@ func NewOutboxEventWorker(logger *slog.Logger, relay OutboxRelay, limit int) *Ou
 // Run continuously processes batches of pending outbox events until the
 // context is canceled.
 func (w *OutboxEventWorker) Run(ctx context.Context) error {
-	timer := time.NewTimer(1 * time.Second)
-	defer timer.Stop()
-
 	for {
 		if err := w.relay.ProcessBatch(ctx, w.limit); err != nil {
 			w.logger.ErrorContext(ctx, "failed to process outbox events", slog.Any("error", err))
 		}
 
+		timer := time.NewTimer(1 * time.Second)
+
 		select {
 		case <-ctx.Done():
+			timer.Stop()
+
 			return ctx.Err()
 		case <-timer.C:
 		}

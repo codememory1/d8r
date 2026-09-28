@@ -32,9 +32,6 @@ func NewInspectTaskWorker(
 // Run continuously claims and processes pending tasks until the context is
 // canceled or an unrecoverable error occurs.
 func (w *InspectTaskWorker) Run(ctx context.Context) error {
-	timer := time.NewTimer(1 * time.Second)
-	defer timer.Stop()
-
 	for {
 		_, err := w.inspectPendingTasksHandler.Handle(ctx, command.InspectPendingTasks{
 			Limit: w.limit,
@@ -44,8 +41,12 @@ func (w *InspectTaskWorker) Run(ctx context.Context) error {
 			w.logger.ErrorContext(ctx, "Failed to inspect pending tasks", slog.Any("error", err))
 		}
 
+		timer := time.NewTimer(1 * time.Second)
+
 		select {
 		case <-ctx.Done():
+			timer.Stop()
+
 			return ctx.Err()
 		case <-timer.C:
 		}

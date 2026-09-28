@@ -33,9 +33,6 @@ func NewDownloadTaskWorker(
 // Run claims pending tasks and processes them concurrently until the context
 // is canceled or task processing returns an error.
 func (w *DownloadTaskWorker) Run(ctx context.Context) error {
-	timer := time.NewTimer(1 * time.Second)
-	defer timer.Stop()
-
 	for {
 		_, err := w.downloadReadyTasksHandlers.Handle(ctx, command.DownloadReadyTasks{
 			Limit: w.limit,
@@ -45,8 +42,12 @@ func (w *DownloadTaskWorker) Run(ctx context.Context) error {
 			w.logger.ErrorContext(ctx, "Failed to download ready tasks", slog.Any("error", err))
 		}
 
+		timer := time.NewTimer(1 * time.Second)
+
 		select {
 		case <-ctx.Done():
+			timer.Stop()
+
 			return ctx.Err()
 		case <-timer.C:
 		}

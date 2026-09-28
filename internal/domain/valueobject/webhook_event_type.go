@@ -16,26 +16,26 @@ var (
 )
 
 const (
-	// webhookEventTaskCreated is emitted after a task has been created.
-	webhookEventTaskCreated = "task.created"
+	// WebhookEventTaskCreated is emitted after a task has been created.
+	WebhookEventTaskCreated = "task.created"
 
-	// webhookEventTaskInspectionStarted is emitted when resource inspection starts.
-	webhookEventTaskInspectionStarted = "task.inspection.started"
+	// WebhookEventTaskInspectionStarted is emitted when resource inspection starts.
+	WebhookEventTaskInspectionStarted = "task.inspection.started"
 
-	// webhookEventTaskInspectionCompleted is emitted after successful inspection.
-	webhookEventTaskInspectionCompleted = "task.inspection.completed"
+	// WebhookEventTaskInspectionCompleted is emitted after successful inspection.
+	WebhookEventTaskInspectionCompleted = "task.inspection.completed"
 
-	// webhookEventTaskInspectionFailed is emitted when resource inspection fails.
-	webhookEventTaskInspectionFailed = "task.inspection.failed"
+	// WebhookEventTaskInspectionFailed is emitted when resource inspection fails.
+	WebhookEventTaskInspectionFailed = "task.inspection.failed"
 
-	// webhookEventTaskDownloadStarted is emitted when resource downloading starts.
-	webhookEventTaskDownloadStarted = "task.download.started"
+	// WebhookEventTaskDownloadStarted is emitted when resource downloading starts.
+	WebhookEventTaskDownloadStarted = "task.download.started"
 
-	// webhookEventTaskDownloadCompleted is emitted after successful downloading.
-	webhookEventTaskDownloadCompleted = "task.download.completed"
+	// WebhookEventTaskDownloadCompleted is emitted after successful downloading.
+	WebhookEventTaskDownloadCompleted = "task.download.completed"
 
-	// webhookEventTaskDownloadFailed is emitted when resource downloading fails.
-	webhookEventTaskDownloadFailed = "task.download.failed"
+	// WebhookEventTaskDownloadFailed is emitted when resource downloading fails.
+	WebhookEventTaskDownloadFailed = "task.download.failed"
 )
 
 // WebhookEventType identifies an event that can trigger a webhook.
@@ -44,13 +44,13 @@ type WebhookEventType string
 // NewWebhookEventType creates a validated webhook event type.
 func NewWebhookEventType(eventType string) (WebhookEventType, error) {
 	switch eventType {
-	case webhookEventTaskCreated,
-		webhookEventTaskInspectionStarted,
-		webhookEventTaskInspectionCompleted,
-		webhookEventTaskInspectionFailed,
-		webhookEventTaskDownloadStarted,
-		webhookEventTaskDownloadCompleted,
-		webhookEventTaskDownloadFailed:
+	case WebhookEventTaskCreated,
+		WebhookEventTaskInspectionStarted,
+		WebhookEventTaskInspectionCompleted,
+		WebhookEventTaskInspectionFailed,
+		WebhookEventTaskDownloadStarted,
+		WebhookEventTaskDownloadCompleted,
+		WebhookEventTaskDownloadFailed:
 		return WebhookEventType(eventType), nil
 	default:
 		return "", ErrInvalidWebhookEventType
