@@ -3,11 +3,14 @@ package command
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/codememory1/d8r/internal/application/download"
+	"github.com/codememory1/d8r/internal/application/event"
 	"github.com/codememory1/d8r/internal/application/inspect"
 	"github.com/codememory1/d8r/internal/application/transaction"
 	"github.com/codememory1/d8r/internal/domain/entity"
+	domainevent "github.com/codememory1/d8r/internal/domain/event"
 	"github.com/codememory1/d8r/internal/domain/repository"
 	"github.com/codememory1/d8r/internal/domain/valueobject"
 	"github.com/codememory1/d8r/pkg/cqrs"
@@ -28,6 +31,7 @@ type InspectTaskHandler struct {
 	taskRepository           repository.TaskRepository
 	taskInspectionRepository repository.TaskInspectionRepository
 	transactionManager       transaction.Manager
+	eventPublisher           event.Publisher
 }
 
 // NewInspectTaskHandler creates a handler for the InspectResource command.
@@ -37,6 +41,7 @@ func NewInspectTaskHandler(
 	taskRepository repository.TaskRepository,
 	taskInspectionRepository repository.TaskInspectionRepository,
 	transactionManager transaction.Manager,
+	eventPublisher event.Publisher,
 ) *InspectTaskHandler {
 	return &InspectTaskHandler{
 		inspector:                inspector,
@@ -44,6 +49,7 @@ func NewInspectTaskHandler(
 		taskRepository:           taskRepository,
 		taskInspectionRepository: taskInspectionRepository,
 		transactionManager:       transactionManager,
+		eventPublisher:           eventPublisher,
 	}
 }
 
@@ -105,6 +111,16 @@ func (h *InspectTaskHandler) Handle(ctx context.Context, cmd InspectTask) (value
 
 		// Persist the inspection so it can be reused without repeated HTTP requests.
 		if err := h.taskInspectionRepository.Save(ctx, taskInspection); err != nil {
+			return err
+		}
+
+		publishEventErr := h.eventPublisher.Publish(ctx, domainevent.NewTaskInspectionStarted(
+			cmd.TaskID,
+			taskInspection.ID(),
+			time.Now(),
+		))
+
+		if err := publishEventErr; err != nil {
 			return err
 		}
 
