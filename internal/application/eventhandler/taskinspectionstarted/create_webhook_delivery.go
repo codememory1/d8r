@@ -49,8 +49,7 @@ func (h *CreateWebhookDeliveryHandler) Handle(ctx context.Context, event ddd.Eve
 	}
 
 	webhookPayload, err := json.Marshal(payload.TaskInspectionStarted{
-		TaskID:       taskInspectionStarted.TaskID.String(),
-		InspectionID: taskInspectionStarted.InspectionID.String(),
+		TaskID: taskInspectionStarted.TaskID.String(),
 	})
 
 	return h.tm.Run(ctx, func(ctx context.Context) error {

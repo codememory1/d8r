@@ -303,7 +303,6 @@ func (a *App) initCommandHandlers() {
 		a.Repositories.Task,
 		a.Repositories.TaskInspection,
 		a.Transaction,
-		a.Services.EventPublisher,
 	)
 
 	a.CommandHandlers.DownloadTask = command.NewDownloadTaskHandler(
@@ -323,8 +322,10 @@ func (a *App) initCommandHandlers() {
 	)
 
 	a.CommandHandlers.InspectPendingTask = command.NewInspectPendingTasksHandler(
+		a.Transaction,
 		a.Claimers.PendingTask,
 		a.CommandHandlers.InspectTask,
+		a.Services.EventPublisher,
 		a.Config.Workers.Inspection.Concurrency,
 	)
 

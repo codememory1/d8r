@@ -16,21 +16,18 @@ const TaskInspectionStartedType ddd.EventType = "task.inspection.started"
 // TaskInspectionStarted represents the domain event emitted when inspection
 // of a task resource starts.
 type TaskInspectionStarted struct {
-	TaskID       valueobject.ID
-	InspectionID valueobject.ID
-	OccurredAt   time.Time
+	TaskID     valueobject.ID
+	OccurredAt time.Time
 }
 
 // NewTaskInspectionStarted creates a task-inspection-started domain event.
 func NewTaskInspectionStarted(
 	taskID valueobject.ID,
-	inspectionID valueobject.ID,
 	OccurredAt time.Time,
 ) TaskInspectionStarted {
 	return TaskInspectionStarted{
-		TaskID:       taskID,
-		InspectionID: inspectionID,
-		OccurredAt:   OccurredAt,
+		TaskID:     taskID,
+		OccurredAt: OccurredAt,
 	}
 }
 
