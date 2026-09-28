@@ -47,9 +47,10 @@ type Download struct {
 
 // Workers contains configuration for all background workers.
 type Workers struct {
-	Download    DownloadWorker    `yaml:"download"`
-	Inspection  InspectionWorker  `yaml:"inspection"`
-	OutboxEvent OutboxEventWorker `yaml:"outbox_event"`
+	Download              DownloadWorker        `yaml:"download"`
+	Inspection            InspectionWorker      `yaml:"inspection"`
+	OutboxEvent           OutboxEventWorker     `yaml:"outbox_event"`
+	WebhookDeliveryWorker WebhookDeliveryWorker `yaml:"webhook_delivery"`
 }
 
 // DownloadWorker contains download-worker concurrency and batch settings.
@@ -70,11 +71,17 @@ type OutboxEventWorker struct {
 	Limit       int `yaml:"limit"`
 }
 
+// WebhookDeliveryWorker defines settings for background webhook delivery
+// processing.
+type WebhookDeliveryWorker struct {
+	Concurrency int `yaml:"concurrency"`
+	Limit       int `yaml:"limit"`
+}
+
 // WebhookConfig contains webhook delivery and retry settings.
 type WebhookConfig struct {
-	Concurrency    uint64        `yaml:"concurrency"`
 	RequestTimeout time.Duration `yaml:"request_timeout"`
-	MaxAttempts    uint64        `yaml:"max_attempts"`
+	MaxAttempts    int           `yaml:"max_attempts"`
 	RetryDelay     time.Duration `yaml:"retry_delay"`
 }
 
@@ -115,9 +122,12 @@ func defaults() Config {
 				Concurrency: 5,
 				Limit:       20,
 			},
+			WebhookDeliveryWorker{
+				Concurrency: 5,
+				Limit:       20,
+			},
 		},
 		Webhook: WebhookConfig{
-			Concurrency:    10,
 			RequestTimeout: 10 * time.Second,
 			MaxAttempts:    5,
 			RetryDelay:     5 * time.Second,
@@ -162,10 +172,6 @@ func (c Config) Validate() error {
 	}
 
 	if err := c.Workers.Validate(); err != nil {
-		return err
-	}
-
-	if err := c.Webhook.Validate(); err != nil {
 		return err
 	}
 
@@ -216,6 +222,10 @@ func (c Workers) Validate() error {
 		return err
 	}
 
+	if err := c.WebhookDeliveryWorker.Validate(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -258,10 +268,10 @@ func (c OutboxEventWorker) Validate() error {
 	return nil
 }
 
-// Validate webhook parameter validation
-func (c WebhookConfig) Validate() error {
+// Validate validates the webhook delivery worker parameters.
+func (c WebhookDeliveryWorker) Validate() error {
 	if c.Concurrency <= 0 {
-		return errors.New("webhook.concurrency must be greater than 0")
+		return errors.New("workers.webhook_delivery must be greater than 0")
 	}
 
 	return nil

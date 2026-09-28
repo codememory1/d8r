@@ -94,6 +94,10 @@ func runWorkers(ctx context.Context, app *bootstrap.App) <-chan error {
 		errCh <- app.Workers.OutboxEvent.Run(ctx)
 	}()
 
+	go func() {
+		errCh <- app.Workers.WebhookDelivery.Run(ctx)
+	}()
+
 	return errCh
 }
 
