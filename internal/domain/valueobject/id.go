@@ -1,6 +1,8 @@
 package valueobject
 
 import (
+	"encoding/json"
+
 	"github.com/codememory1/d8r/internal/domain"
 	"github.com/codememory1/d8r/pkg/ddd"
 	"github.com/google/uuid"
@@ -46,4 +48,27 @@ func (v ID) UUID() uuid.UUID {
 // String returns the canonical string representation of the identifier.
 func (v ID) String() string {
 	return v.value.String()
+}
+
+func (v ID) MarshalJSON() ([]byte, error) {
+	return json.Marshal(v.value)
+}
+
+//goland:noinspection GoMixedReceiverTypes
+func (v *ID) UnmarshalJSON(data []byte) error {
+	var value string
+
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+
+	parsed, err := ParseID(value)
+
+	if err != nil {
+		return err
+	}
+
+	*v = parsed
+
+	return nil
 }
