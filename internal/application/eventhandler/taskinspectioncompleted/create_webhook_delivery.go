@@ -1,4 +1,4 @@
-package taskinspectionstarted
+package taskinspectioncompleted
 
 import (
 	"context"
@@ -14,14 +14,14 @@ import (
 	"github.com/codememory1/d8r/pkg/ddd"
 )
 
-// CreateWebhookDeliveryHandler creates webhook deliveries for the task.inspection.started event.
+// CreateWebhookDeliveryHandler creates webhook deliveries for the task.inspection.completed event.
 type CreateWebhookDeliveryHandler struct {
 	webhookRepository         repository.WebhookRepository
 	webhookDeliveryRepository repository.WebhookDeliveryRepository
 	tm                        transaction.Manager
 }
 
-// NewCreateWebhookDeliveryHandler creates a task.inspection.started event handler.
+// NewCreateWebhookDeliveryHandler creates a task.created event handler.
 func NewCreateWebhookDeliveryHandler(
 	webhookRepository repository.WebhookRepository,
 	webhookDeliveryRepository repository.WebhookDeliveryRepository,
@@ -34,22 +34,23 @@ func NewCreateWebhookDeliveryHandler(
 	}
 }
 
-// Handle creates a delivery for every enabled webhook subscribed to task.created.
+// Handle creates a delivery for every enabled webhook subscribed to task.inspection.completed.
 func (h *CreateWebhookDeliveryHandler) Handle(ctx context.Context, event ddd.Event) error {
-	taskInspectionStarted, ok := event.(*domainevent.TaskInspectionStarted)
+	taskInspectionCompleted, ok := event.(*domainevent.TaskInspectionCompleted)
 
 	if !ok {
-		return fmt.Errorf("expected *event.TaskInspectionStarted, got %T", event)
+		return fmt.Errorf("expected *event.TaskInspectionCompleted, got %T", event)
 	}
 
-	webhooks, err := h.webhookRepository.FindEnabledByEventType(ctx, valueobject.WebhookEventTaskInspectionStarted)
+	webhooks, err := h.webhookRepository.FindEnabledByEventType(ctx, valueobject.WebhookEventTaskInspectionCompleted)
 
 	if err != nil {
 		return fmt.Errorf("find subscribed webhooks: %w", err)
 	}
 
-	webhookPayload, err := json.Marshal(payload.TaskInspectionStarted{
-		TaskID: taskInspectionStarted.TaskID.String(),
+	webhookPayload, err := json.Marshal(payload.TaskInspectionCompleted{
+		TaskID:       taskInspectionCompleted.InspectionID.String(),
+		InspectionID: taskInspectionCompleted.InspectionID.String(),
 	})
 
 	return h.tm.Run(ctx, func(ctx context.Context) error {
@@ -60,7 +61,7 @@ func (h *CreateWebhookDeliveryHandler) Handle(ctx context.Context, event ddd.Eve
 
 			err = h.webhookDeliveryRepository.Save(ctx, entity.NewWebhookDelivery(
 				webhook.ID(),
-				valueobject.WebhookEventTaskInspectionStarted,
+				valueobject.WebhookEventTaskInspectionCompleted,
 				webhookPayload,
 			))
 
