@@ -2,6 +2,7 @@ package outbox
 
 import (
 	"context"
+	"errors"
 
 	appevent "github.com/codememory1/d8r/internal/application/event"
 	"golang.org/x/sync/errgroup"
@@ -62,15 +63,15 @@ func (r *Relay) processMessage(ctx context.Context, message Message) error {
 	event, err := r.registry.Get(message.EventType)
 
 	if err != nil {
-		return r.store.MarkFailed(ctx, message)
+		return errors.Join(err, r.store.MarkFailed(ctx, message))
 	}
 
 	if decodeErr := r.decoder.Decode(message.Payload, event); decodeErr != nil {
-		return r.store.MarkFailed(ctx, message)
+		return errors.Join(decodeErr, r.store.MarkFailed(ctx, message))
 	}
 
-	if err := r.dispatcher.Dispatch(ctx, event); err != nil {
-		return r.store.MarkFailed(ctx, message)
+	if dispatchErr := r.dispatcher.Dispatch(ctx, event); dispatchErr != nil {
+		return errors.Join(dispatchErr, r.store.MarkFailed(ctx, message))
 	}
 
 	if markProcessedErr := r.store.MarkProcessed(ctx, message); markProcessedErr != nil {
