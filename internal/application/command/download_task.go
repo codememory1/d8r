@@ -93,8 +93,20 @@ func (h *DownloadTaskHandler) Handle(ctx context.Context, cmd DownloadTask) (str
 			return struct{}{}, errors.Join(downloadErr, failTransitionErr)
 		}
 
-		if updateErr := h.taskRepository.Update(ctx, task); updateErr != nil {
-			return struct{}{}, errors.Join(downloadErr, updateErr)
+		// Persist the fail state and publish its event within the same transaction.
+		transactionErr := h.tm.Run(ctx, func(ctx context.Context) error {
+			if updateErr := h.taskRepository.Update(ctx, task); updateErr != nil {
+				return errors.Join(downloadErr, updateErr)
+			}
+
+			return h.eventPublisher.Publish(ctx, domainevent.NewTaskDownloadFailed(
+				task.ID(),
+				time.Now(),
+			))
+		})
+
+		if transactionErr != nil {
+			return struct{}{}, errors.Join(downloadErr, transactionErr)
 		}
 
 		return struct{}{}, err

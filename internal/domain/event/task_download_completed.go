@@ -7,7 +7,7 @@ import (
 	"github.com/codememory1/d8r/pkg/ddd"
 )
 
-// Ensure TaskCreated implements the domain event contract.
+// Ensure TaskDownloadCompleted implements the domain event contract.
 var _ ddd.Event = (*TaskDownloadCompleted)(nil)
 
 // TaskDownloadCompletedType identifies the task download completed event.
