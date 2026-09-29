@@ -17,7 +17,7 @@ type ID struct {
 
 // NewID generates a new random identifier.
 func NewID() ID {
-	return ID{uuid.New()}
+	return ID{uuid.Must(uuid.NewV7())}
 }
 
 // ParseID parses and validates an identifier from its string representation.
