@@ -9,6 +9,7 @@ import (
 	appdownload "github.com/codememory1/d8r/internal/application/download"
 	appevent "github.com/codememory1/d8r/internal/application/event"
 	"github.com/codememory1/d8r/internal/application/eventhandler/taskcreated"
+	"github.com/codememory1/d8r/internal/application/eventhandler/taskdownloadstarted"
 	"github.com/codememory1/d8r/internal/application/eventhandler/taskinspectioncompleted"
 	"github.com/codememory1/d8r/internal/application/eventhandler/taskinspectionfailed"
 	"github.com/codememory1/d8r/internal/application/eventhandler/taskinspectionstarted"
@@ -41,19 +42,20 @@ import (
 
 // Services contains shared application and infrastructure services.
 type Services struct {
-	Responder        respond.Responder
-	Storage          storage.Storage
-	EventDispatcher  *eventbus.Dispatcher
-	EventPublisher   appevent.Publisher
-	EventRegistry    *eventregistry.Registry
-	EventEncoder     infraoutbox.Encoder
-	EventDecoder     infraoutbox.Decoder
-	OutboxStore      infraoutbox.Store
-	OutboxRelay      worker.OutboxRelay
-	StrategySelector *appdownload.StrategySelector
-	Inspector        appinspect.Inspector
-	Downloader       appdownload.Downloader
-	WebhookSender    appwebhook.Sender
+	Responder              respond.Responder
+	Storage                storage.Storage
+	EventDispatcher        *eventbus.Dispatcher
+	EventPublisher         appevent.Publisher
+	EventRegistry          *eventregistry.Registry
+	EventEncoder           infraoutbox.Encoder
+	EventDecoder           infraoutbox.Decoder
+	OutboxStore            infraoutbox.Store
+	OutboxRelay            worker.OutboxRelay
+	StrategySelector       *appdownload.StrategySelector
+	Inspector              appinspect.Inspector
+	Downloader             appdownload.Downloader
+	WebhookSender          appwebhook.Sender
+	WebhookDeliveryCreator *appwebhook.DeliveryCreator
 }
 
 // Repositories contains domain repository implementations used by the application.
@@ -115,12 +117,18 @@ type TaskInspectionFailedEventHandlers struct {
 	CreateWebhookDelivery *taskinspectionfailed.CreateWebhookDeliveryHandler
 }
 
+// TaskDownloadStartedEventHandlers contains reactions to the task.download.started domain event.
+type TaskDownloadStartedEventHandlers struct {
+	CreateWebhookDelivery *taskdownloadstarted.CreateWebhookDeliveryHandler
+}
+
 // EventHandlers contains application handlers for domain events.
 type EventHandlers struct {
 	TaskCreated             TaskCreatedEventHandlers
 	TaskInspectionStarted   TaskInspectionStartedEventHandlers
 	TaskInspectionCompleted TaskInspectionCompletedEventHandlers
 	TaskInspectionFailed    TaskInspectionFailedEventHandlers
+	TaskDownloadStarted     TaskDownloadStartedEventHandlers
 }
 
 // Controllers contains the application's HTTP controllers.
@@ -201,8 +209,8 @@ func (a *App) Close() {
 
 // compose initializes and connects application dependencies in dependency order.
 func (a *App) compose() error {
-	a.initServices()
 	a.initPersistence()
+	a.initServices()
 	a.initReaders()
 
 	a.initCommandHandlers()
@@ -263,6 +271,11 @@ func (a *App) initServices() {
 	)
 
 	a.Services.WebhookSender = infrawebhook.NewHTTPSender(&http.Client{})
+	a.Services.WebhookDeliveryCreator = appwebhook.NewDeliveryCreator(
+		a.Transaction,
+		a.Repositories.Webhook,
+		a.Repositories.WebhookDelivery,
+	)
 }
 
 // registerEventFactories registers factories used to reconstruct domain events
@@ -283,6 +296,10 @@ func (a *App) registerEventFactories() {
 	a.Services.EventRegistry.Register(domainevent.TaskInspectionFailedType, func() ddd.Event {
 		return &domainevent.TaskInspectionFailed{}
 	})
+
+	a.Services.EventRegistry.Register(domainevent.TaskDownloadStartedType, func() ddd.Event {
+		return &domainevent.TaskDownloadStarted{}
+	})
 }
 
 // subscribeEventHandlers connects domain event types to their application handlers.
@@ -291,6 +308,7 @@ func (a *App) subscribeEventHandlers() {
 	a.Services.EventDispatcher.Subscribe(domainevent.TaskInspectionStartedType, a.EventHandlers.TaskInspectionStarted.CreateWebhookDelivery)
 	a.Services.EventDispatcher.Subscribe(domainevent.TaskInspectionCompletedType, a.EventHandlers.TaskInspectionCompleted.CreateWebhookDelivery)
 	a.Services.EventDispatcher.Subscribe(domainevent.TaskInspectionFailedType, a.EventHandlers.TaskInspectionFailed.CreateWebhookDelivery)
+	a.Services.EventDispatcher.Subscribe(domainevent.TaskDownloadStartedType, a.EventHandlers.TaskDownloadStarted.CreateWebhookDelivery)
 }
 
 // initPersistence initializes repository and task-claiming implementations.
@@ -341,6 +359,8 @@ func (a *App) initCommandHandlers() {
 	)
 
 	a.CommandHandlers.DownloadReadyTasks = command.NewDownloadReadyTasksHandler(
+		a.Transaction,
+		a.Services.EventPublisher,
 		a.Claimers.ReadyToDownloadTask,
 		a.CommandHandlers.DownloadTask,
 		a.Config.Workers.Download.Concurrency,
@@ -378,28 +398,22 @@ func (a *App) initQueryHandlers() {
 
 // initEventHandlers initializes application domain event handlers.
 func (a *App) initEventHandlers() {
-	a.EventHandlers.TaskCreated.CreateWebhookDelivery = taskcreated.NewCreateWebhookDeliveryHandler(
-		a.Repositories.Webhook,
-		a.Repositories.WebhookDelivery,
-		a.Transaction,
-	)
+	a.EventHandlers.TaskCreated.CreateWebhookDelivery = taskcreated.NewCreateWebhookDeliveryHandler(a.Services.WebhookDeliveryCreator)
 
 	a.EventHandlers.TaskInspectionStarted.CreateWebhookDelivery = taskinspectionstarted.NewCreateWebhookDeliveryHandler(
-		a.Repositories.Webhook,
-		a.Repositories.WebhookDelivery,
-		a.Transaction,
+		a.Services.WebhookDeliveryCreator,
 	)
 
 	a.EventHandlers.TaskInspectionCompleted.CreateWebhookDelivery = taskinspectioncompleted.NewCreateWebhookDeliveryHandler(
-		a.Repositories.Webhook,
-		a.Repositories.WebhookDelivery,
-		a.Transaction,
+		a.Services.WebhookDeliveryCreator,
 	)
 
 	a.EventHandlers.TaskInspectionFailed.CreateWebhookDelivery = taskinspectionfailed.NewCreateWebhookDeliveryHandler(
-		a.Repositories.Webhook,
-		a.Repositories.WebhookDelivery,
-		a.Transaction,
+		a.Services.WebhookDeliveryCreator,
+	)
+
+	a.EventHandlers.TaskDownloadStarted.CreateWebhookDelivery = taskdownloadstarted.NewCreateWebhookDeliveryHandler(
+		a.Services.WebhookDeliveryCreator,
 	)
 }
 

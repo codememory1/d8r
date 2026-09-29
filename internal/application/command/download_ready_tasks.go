@@ -2,7 +2,12 @@ package command
 
 import (
 	"context"
+	"fmt"
+	"time"
 
+	"github.com/codememory1/d8r/internal/application/event"
+	"github.com/codememory1/d8r/internal/application/transaction"
+	domainevent "github.com/codememory1/d8r/internal/domain/event"
 	"github.com/codememory1/d8r/internal/domain/valueobject"
 	"github.com/codememory1/d8r/pkg/cqrs"
 	"golang.org/x/sync/errgroup"
@@ -25,6 +30,8 @@ type DownloadReadyTasks struct {
 // DownloadReadyTasksHandler claims ready tasks and processes their downloads
 // concurrently.
 type DownloadReadyTasksHandler struct {
+	tm                  transaction.Manager
+	eventPublisher      event.Publisher
 	taskClaimer         ReadyToDownloadTaskClaimer
 	downloadTaskHandler cqrs.CommandHandler[DownloadTask, struct{}]
 	concurrency         int
@@ -33,11 +40,15 @@ type DownloadReadyTasksHandler struct {
 // NewDownloadReadyTasksHandler creates a handler for processing batches of
 // tasks that are ready to be downloaded.
 func NewDownloadReadyTasksHandler(
+	tm transaction.Manager,
+	eventPublisher event.Publisher,
 	taskClaimer ReadyToDownloadTaskClaimer,
 	downloadTaskHandler cqrs.CommandHandler[DownloadTask, struct{}],
 	concurrency int,
 ) *DownloadReadyTasksHandler {
 	return &DownloadReadyTasksHandler{
+		tm:                  tm,
+		eventPublisher:      eventPublisher,
 		taskClaimer:         taskClaimer,
 		downloadTaskHandler: downloadTaskHandler,
 		concurrency:         concurrency,
@@ -47,7 +58,35 @@ func NewDownloadReadyTasksHandler(
 // Handle claims a batch of ready tasks and downloads them concurrently,
 // respecting the configured concurrency limit.
 func (h *DownloadReadyTasksHandler) Handle(ctx context.Context, cmd DownloadReadyTasks) (struct{}, error) {
-	taskIDs, err := h.taskClaimer.ClaimReadyToDownload(ctx, cmd.Limit)
+	var taskIDs []valueobject.ID
+
+	err := h.tm.Run(ctx, func(ctx context.Context) error {
+		var err error
+
+		taskIDs, err = h.taskClaimer.ClaimReadyToDownload(ctx, cmd.Limit)
+
+		if err != nil {
+			return err
+		}
+
+		for _, taskID := range taskIDs {
+			publishErr := h.eventPublisher.Publish(ctx, domainevent.NewTaskDownloadStarted(
+				taskID,
+				time.Now(),
+			))
+
+			if publishErr != nil {
+				return fmt.Errorf(
+					"publish %s event for task %s: %w",
+					domainevent.TaskDownloadStartedType,
+					taskID.String(),
+					publishErr,
+				)
+			}
+		}
+
+		return nil
+	})
 
 	if err != nil {
 		return struct{}{}, err

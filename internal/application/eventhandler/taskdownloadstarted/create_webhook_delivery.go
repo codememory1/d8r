@@ -1,4 +1,4 @@
-package taskinspectioncompleted
+package taskdownloadstarted
 
 import (
 	"context"
@@ -12,34 +12,33 @@ import (
 	"github.com/codememory1/d8r/pkg/ddd"
 )
 
-// CreateWebhookDeliveryHandler creates webhook deliveries for the task.inspection.completed event.
+// CreateWebhookDeliveryHandler creates webhook deliveries for the task.download.started event.
 type CreateWebhookDeliveryHandler struct {
 	webhookDeliveryCreator *webhook.DeliveryCreator
 }
 
-// NewCreateWebhookDeliveryHandler creates a task.created event handler.
+// NewCreateWebhookDeliveryHandler creates a task.download.started event handler.
 func NewCreateWebhookDeliveryHandler(webhookDeliveryCreator *webhook.DeliveryCreator) *CreateWebhookDeliveryHandler {
 	return &CreateWebhookDeliveryHandler{
 		webhookDeliveryCreator: webhookDeliveryCreator,
 	}
 }
 
-// Handle creates a delivery for every enabled webhook subscribed to task.inspection.completed.
+// Handle creates a delivery for every enabled webhook subscribed to task.created.
 func (h *CreateWebhookDeliveryHandler) Handle(ctx context.Context, event ddd.Event) error {
-	completedEvent, ok := event.(*domainevent.TaskInspectionCompleted)
+	startedEvent, ok := event.(*domainevent.TaskDownloadStarted)
 
 	if !ok {
-		return fmt.Errorf("expected *event.TaskInspectionCompleted, got %T", event)
+		return fmt.Errorf("expected *event.TaskDownloadStarted, got %T", event)
 	}
 
-	webhookPayload, err := json.Marshal(payload.TaskInspectionCompleted{
-		TaskID:       completedEvent.InspectionID.String(),
-		InspectionID: completedEvent.InspectionID.String(),
+	webhookPayload, err := json.Marshal(payload.TaskDownloadStarted{
+		TaskID: startedEvent.TaskID.String(),
 	})
 
 	if err != nil {
 		return err
 	}
 
-	return h.webhookDeliveryCreator.Create(ctx, valueobject.WebhookEventTaskInspectionCompleted, webhookPayload)
+	return h.webhookDeliveryCreator.Create(ctx, valueobject.WebhookEventTaskDownloadStarted, webhookPayload)
 }
