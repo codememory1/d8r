@@ -30,7 +30,7 @@ type InspectTaskHandler struct {
 	strategySelector         *download.StrategySelector
 	taskRepository           repository.TaskRepository
 	taskInspectionRepository repository.TaskInspectionRepository
-	transactionManager       transaction.Manager
+	tm                       transaction.Manager
 	eventPublisher           event.Publisher
 }
 
@@ -40,7 +40,7 @@ func NewInspectTaskHandler(
 	strategySelector *download.StrategySelector,
 	taskRepository repository.TaskRepository,
 	taskInspectionRepository repository.TaskInspectionRepository,
-	transactionManager transaction.Manager,
+	tm transaction.Manager,
 	eventPublisher event.Publisher,
 ) *InspectTaskHandler {
 	return &InspectTaskHandler{
@@ -48,7 +48,7 @@ func NewInspectTaskHandler(
 		strategySelector:         strategySelector,
 		taskRepository:           taskRepository,
 		taskInspectionRepository: taskInspectionRepository,
-		transactionManager:       transactionManager,
+		tm:                       tm,
 		eventPublisher:           eventPublisher,
 	}
 }
@@ -76,11 +76,19 @@ func (h *InspectTaskHandler) Handle(ctx context.Context, cmd InspectTask) (value
 			return valueobject.ID{}, errors.Join(inspectErr, failTransitionErr)
 		}
 
-		if updateErr := h.taskRepository.Update(ctx, task); updateErr != nil {
-			return valueobject.ID{}, errors.Join(
-				inspectErr,
-				updateErr,
-			)
+		transactionErr := h.tm.Run(ctx, func(ctx context.Context) error {
+			if err := h.taskRepository.Update(ctx, task); err != nil {
+				return err
+			}
+
+			return h.eventPublisher.Publish(ctx, domainevent.NewTaskInspectionFailed(
+				cmd.TaskID,
+				time.Now(),
+			))
+		})
+
+		if transactionErr != nil {
+			return valueobject.ID{}, errors.Join(inspectErr, transactionErr)
 		}
 
 		return valueobject.ID{}, inspectErr
@@ -104,7 +112,7 @@ func (h *InspectTaskHandler) Handle(ctx context.Context, cmd InspectTask) (value
 		return valueobject.ID{}, readyTransitionErr
 	}
 
-	err = h.transactionManager.Run(ctx, func(ctx context.Context) error {
+	err = h.tm.Run(ctx, func(ctx context.Context) error {
 		if updateErr := h.taskRepository.Update(ctx, task); updateErr != nil {
 			return updateErr
 		}
