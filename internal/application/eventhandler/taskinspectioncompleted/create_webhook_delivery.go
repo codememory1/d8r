@@ -1,4 +1,4 @@
-package taskcreated
+package taskinspectioncompleted
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 	"github.com/codememory1/d8r/pkg/ddd"
 )
 
-// CreateWebhookDeliveryHandler creates webhook deliveries for the task.created event.
+// CreateWebhookDeliveryHandler creates webhook deliveries for the task.inspection.completed event.
 type CreateWebhookDeliveryHandler struct {
 	webhookDeliveryCreator *webhook.DeliveryCreator
 }
@@ -24,21 +24,22 @@ func NewCreateWebhookDeliveryHandler(webhookDeliveryCreator *webhook.DeliveryCre
 	}
 }
 
-// Handle creates a delivery for every enabled webhook subscribed to task.created.
+// Handle creates a delivery for every enabled webhook subscribed to task.inspection.completed.
 func (h *CreateWebhookDeliveryHandler) Handle(ctx context.Context, event ddd.Event) error {
-	createdEvent, ok := event.(*domainevent.TaskCreated)
+	completedEvent, ok := event.(*domainevent.TaskInspectionCompleted)
 
 	if !ok {
-		return fmt.Errorf("expected *event.TaskCreated, got %T", event)
+		return fmt.Errorf("expected *event.TaskInspectionCompleted, got %T", event)
 	}
 
-	webhookPayload, err := json.Marshal(payload.TaskCreatedPayload{
-		TaskID: createdEvent.ID.String(),
+	webhookPayload, err := json.Marshal(payload.TaskInspectionCompleted{
+		TaskID:       completedEvent.InspectionID.String(),
+		InspectionID: completedEvent.InspectionID.String(),
 	})
 
 	if err != nil {
 		return err
 	}
 
-	return h.webhookDeliveryCreator.Create(ctx, valueobject.WebhookEventTaskCreated, webhookPayload)
+	return h.webhookDeliveryCreator.Create(ctx, valueobject.WebhookEventTaskInspectionCompleted, webhookPayload)
 }

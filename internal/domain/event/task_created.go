@@ -7,6 +7,9 @@ import (
 	"github.com/codememory1/d8r/pkg/ddd"
 )
 
+// Ensure TaskCreated implements the domain event contract.
+var _ ddd.Event = (*TaskCreated)(nil)
+
 // TaskCreatedType identifies the event emitted when a task is created.
 const TaskCreatedType ddd.EventType = "task.created"
 

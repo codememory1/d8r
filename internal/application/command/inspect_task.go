@@ -3,11 +3,14 @@ package command
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/codememory1/d8r/internal/application/download"
+	"github.com/codememory1/d8r/internal/application/event"
 	"github.com/codememory1/d8r/internal/application/inspect"
 	"github.com/codememory1/d8r/internal/application/transaction"
 	"github.com/codememory1/d8r/internal/domain/entity"
+	domainevent "github.com/codememory1/d8r/internal/domain/event"
 	"github.com/codememory1/d8r/internal/domain/repository"
 	"github.com/codememory1/d8r/internal/domain/valueobject"
 	"github.com/codememory1/d8r/pkg/cqrs"
@@ -27,7 +30,8 @@ type InspectTaskHandler struct {
 	strategySelector         *download.StrategySelector
 	taskRepository           repository.TaskRepository
 	taskInspectionRepository repository.TaskInspectionRepository
-	transactionManager       transaction.Manager
+	tm                       transaction.Manager
+	eventPublisher           event.Publisher
 }
 
 // NewInspectTaskHandler creates a handler for the InspectResource command.
@@ -36,14 +40,16 @@ func NewInspectTaskHandler(
 	strategySelector *download.StrategySelector,
 	taskRepository repository.TaskRepository,
 	taskInspectionRepository repository.TaskInspectionRepository,
-	transactionManager transaction.Manager,
+	tm transaction.Manager,
+	eventPublisher event.Publisher,
 ) *InspectTaskHandler {
 	return &InspectTaskHandler{
 		inspector:                inspector,
 		strategySelector:         strategySelector,
 		taskRepository:           taskRepository,
 		taskInspectionRepository: taskInspectionRepository,
-		transactionManager:       transactionManager,
+		tm:                       tm,
+		eventPublisher:           eventPublisher,
 	}
 }
 
@@ -70,11 +76,19 @@ func (h *InspectTaskHandler) Handle(ctx context.Context, cmd InspectTask) (value
 			return valueobject.ID{}, errors.Join(inspectErr, failTransitionErr)
 		}
 
-		if updateErr := h.taskRepository.Update(ctx, task); updateErr != nil {
-			return valueobject.ID{}, errors.Join(
-				inspectErr,
-				updateErr,
-			)
+		transactionErr := h.tm.Run(ctx, func(ctx context.Context) error {
+			if err := h.taskRepository.Update(ctx, task); err != nil {
+				return err
+			}
+
+			return h.eventPublisher.Publish(ctx, domainevent.NewTaskInspectionFailed(
+				cmd.TaskID,
+				time.Now(),
+			))
+		})
+
+		if transactionErr != nil {
+			return valueobject.ID{}, errors.Join(inspectErr, transactionErr)
 		}
 
 		return valueobject.ID{}, inspectErr
@@ -98,7 +112,7 @@ func (h *InspectTaskHandler) Handle(ctx context.Context, cmd InspectTask) (value
 		return valueobject.ID{}, readyTransitionErr
 	}
 
-	err = h.transactionManager.Run(ctx, func(ctx context.Context) error {
+	err = h.tm.Run(ctx, func(ctx context.Context) error {
 		if updateErr := h.taskRepository.Update(ctx, task); updateErr != nil {
 			return updateErr
 		}
@@ -108,7 +122,11 @@ func (h *InspectTaskHandler) Handle(ctx context.Context, cmd InspectTask) (value
 			return err
 		}
 
-		return nil
+		return h.eventPublisher.Publish(ctx, domainevent.NewTaskInspectionCompleted(
+			cmd.TaskID,
+			taskInspection.ID(),
+			time.Now(),
+		))
 	})
 
 	if err != nil {
