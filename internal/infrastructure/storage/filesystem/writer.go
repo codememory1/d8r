@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+
+	"github.com/codememory1/d8r/internal/infrastructure/storage"
 )
 
 // WriterFunc writes a chunk of resource data and returns the number of bytes
@@ -29,7 +31,7 @@ func NewWriter(file *os.File, bufferSize int64) (*Writer, error) {
 
 // WriteAt reads data from reader and writes it to the file,
 // starting at the specified offset.
-func (w *Writer) WriteAt(_ context.Context, reader io.Reader, offset int64) (int64, error) {
+func (w *Writer) WriteAt(_ context.Context, reader io.Reader, offset int64, lifecycle storage.Lifecycle) (int64, error) {
 	return w.copyTo(reader, func(data []byte) (int, error) {
 		written, writeErr := w.file.WriteAt(data, offset)
 
@@ -42,14 +44,14 @@ func (w *Writer) WriteAt(_ context.Context, reader io.Reader, offset int64) (int
 		offset += int64(written)
 
 		return written, nil
-	})
+	}, lifecycle)
 }
 
 // Write sequentially reads data from the reader and writes it to the file.
-func (w *Writer) Write(_ context.Context, reader io.Reader) (int64, error) {
+func (w *Writer) Write(_ context.Context, reader io.Reader, lifecycle storage.Lifecycle) (int64, error) {
 	return w.copyTo(reader, func(data []byte) (int, error) {
 		return w.file.Write(data)
-	})
+	}, lifecycle)
 }
 
 // Close closes the open file.
@@ -59,7 +61,7 @@ func (w *Writer) Close() error {
 
 // copyTo reads data from reader and writes it using the provided function,
 // calling onProgress after each successful write.
-func (w *Writer) copyTo(reader io.Reader, writer WriterFunc) (int64, error) {
+func (w *Writer) copyTo(reader io.Reader, writer WriterFunc, lifecycle storage.Lifecycle) (int64, error) {
 	buffer := make([]byte, w.bufferSize)
 
 	var uploaded int64
@@ -81,6 +83,10 @@ func (w *Writer) copyTo(reader io.Reader, writer WriterFunc) (int64, error) {
 
 			// Increment the total number of successfully written bytes.
 			uploaded += int64(written)
+
+			if lifecycle.OnProgress != nil {
+				lifecycle.OnProgress(uploaded)
+			}
 		}
 
 		if readErr != nil {

@@ -81,7 +81,10 @@ func (h *DownloadTaskHandler) Handle(ctx context.Context, cmd DownloadTask) (str
 		LastModified: taskInspection.LastModifiedAt(),
 	}
 
-	if downloadErr := h.downloader.Download(ctx, options); downloadErr != nil {
+	// Build lifecycle callbacks for the download.
+	lifecycle := h.buildLifecycle(ctx, cmd.TaskID)
+
+	if downloadErr := h.downloader.Download(ctx, options, lifecycle); downloadErr != nil {
 		// Propagate context cancellation without marking the task as failed.
 		if ctx.Err() != nil {
 			return struct{}{}, ctx.Err()
@@ -134,4 +137,9 @@ func (h *DownloadTaskHandler) Handle(ctx context.Context, cmd DownloadTask) (str
 	}
 
 	return struct{}{}, nil
+}
+
+// buildLifecycle builds download lifecycle callbacks for the specified task.
+func (h *DownloadTaskHandler) buildLifecycle(ctx context.Context, taskID valueobject.ID) download.Lifecycle {
+	return download.Lifecycle{}
 }

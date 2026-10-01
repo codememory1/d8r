@@ -2,6 +2,7 @@ package httpdownload
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/codememory1/d8r/internal/application/download"
@@ -12,7 +13,7 @@ import (
 // downloadParallel Performs a parallel download of a resource by splitting it into ranges
 // and downloading them simultaneously, subject to a limit on the number
 // of parallel requests.
-func (d *HttpDownloader) downloadParallel(ctx context.Context, options download.Options) error {
+func (d *HttpDownloader) downloadParallel(ctx context.Context, options download.Options, lifecycle download.Lifecycle) error {
 	filename := d.resolveFilename(options)
 
 	// Creates a writer to which the downloaded data will be written.
@@ -42,7 +43,7 @@ func (d *HttpDownloader) downloadParallel(ctx context.Context, options download.
 		}
 
 		g.Go(func() error {
-			return d.downloadPart(ctx, options.URL.String(), writer, httpRange)
+			return d.downloadPart(ctx, options.URL.String(), writer, httpRange, lifecycle)
 		})
 	}
 
@@ -57,6 +58,7 @@ func (d *HttpDownloader) downloadPart(
 	url string,
 	writer storage.Writer,
 	httpRange HTTPRange,
+	lifecycle download.Lifecycle,
 ) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 
@@ -66,20 +68,45 @@ func (d *HttpDownloader) downloadPart(
 
 	req.Header.Set("Range", httpRange.HeaderValue())
 
-	resp, err := d.client.Do(req)
+	partSize := httpRange.End - httpRange.Start + 1
 
-	if err != nil {
-		return err
-	}
+	return d.retry.Do(ctx, func() error {
+		if lifecycle.OnActiveRequestsChanged != nil {
+			lifecycle.OnActiveRequestsChanged(1)
 
-	defer resp.Body.Close()
+			defer lifecycle.OnActiveRequestsChanged(-1)
+		}
 
-	// Loads a portion of the resource's content into the writer.
-	_, err = writer.WriteAt(ctx, resp.Body, httpRange.Start)
+		resp, err := d.client.Do(req)
 
-	if err != nil {
-		return err
-	}
+		if err != nil {
+			return err
+		}
 
-	return nil
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusPartialContent {
+			return fmt.Errorf("unexpected HTTP status: %s", resp.Status)
+		}
+
+		// Loads a portion of the resource's content into the writer.
+		written, err := writer.WriteAt(ctx, resp.Body, httpRange.Start, storage.Lifecycle{
+			OnProgress: lifecycle.OnProgress,
+		})
+
+		if err != nil {
+			return err
+		}
+
+		// The number of written bytes is being checked.
+		if written != partSize {
+			return fmt.Errorf(
+				"download part size mismatch: expected %d bytes, wrote %d bytes",
+				partSize,
+				written,
+			)
+		}
+
+		return nil
+	})
 }

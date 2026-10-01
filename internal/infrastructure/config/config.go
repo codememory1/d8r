@@ -36,6 +36,12 @@ type Postgres struct {
 	Database string `yaml:"database"`
 }
 
+// Retry configures the maximum number of attempts and the delay between retries.
+type Retry struct {
+	MaxAttempts int           `yaml:"max_attempts"`
+	Delay       time.Duration `yaml:"delay"`
+}
+
 // Download contains resource inspection and downloading configuration.
 type Download struct {
 	MinParallelSize  ByteSize `yaml:"min_parallel_size"`
@@ -43,6 +49,7 @@ type Download struct {
 	PartSize         ByteSize `yaml:"part_size"`
 	MaxParallelParts int      `yaml:"max_parallel_parts"`
 	RangeParts       int      `yaml:"range_parts"`
+	Retry            Retry    `yaml:"retry"`
 }
 
 // Workers contains configuration for all background workers.
@@ -108,6 +115,10 @@ func defaults() Config {
 			PartSize:         ByteSize(5 * humanize.MiByte),   // 5MiB
 			MaxParallelParts: 5,
 			RangeParts:       5,
+			Retry: Retry{
+				MaxAttempts: 3,
+				Delay:       10 * time.Millisecond,
+			},
 		},
 		Workers: Workers{
 			DownloadWorker{
@@ -199,10 +210,27 @@ func (c Postgres) Validate() error {
 	return nil
 }
 
+// Validate validates Retry configuration parameters.
+func (c Retry) Validate() error {
+	if c.MaxAttempts <= 0 {
+		return errors.New("retry.max_attempts must be greater than 0")
+	}
+
+	if c.Delay.Seconds() <= 0 {
+		return errors.New("retry.delay must be greater than 0")
+	}
+
+	return nil
+}
+
 // Validate validates Download configuration parameters.
 func (c Download) Validate() error {
 	if c.MinParallelSize.Bytes() <= 0 {
 		return errors.New("download.min_parallel_size must be greater than 0")
+	}
+
+	if err := c.Retry.Validate(); err != nil {
+		return err
 	}
 
 	return nil

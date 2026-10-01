@@ -277,6 +277,10 @@ func (a *App) initServices() {
 	a.Services.Downloader = httpdownload.NewHttpDownloader(
 		&http.Client{},
 		a.Services.Storage,
+		httpdownload.Retry{
+			MaxAttempts: a.Config.Download.Retry.MaxAttempts,
+			Delay:       a.Config.Download.Retry.Delay,
+		},
 		httpdownload.Options{
 			BufferSize:       a.Config.Download.BufferSize.Bytes(),
 			MaxParallelParts: a.Config.Download.MaxParallelParts,
