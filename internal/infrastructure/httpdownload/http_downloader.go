@@ -16,22 +16,29 @@ import (
 type HttpDownloader struct {
 	client  *http.Client
 	storage storage.Storage
+	retry   Retry
 	options Options
 }
 
 // NewHttpDownloader creates a new HTTP downloader.
-func NewHttpDownloader(client *http.Client, storage storage.Storage, options Options) *HttpDownloader {
+func NewHttpDownloader(
+	client *http.Client,
+	storage storage.Storage,
+	retry Retry,
+	options Options,
+) *HttpDownloader {
 	return &HttpDownloader{
 		client:  client,
 		storage: storage,
+		retry:   retry,
 		options: options,
 	}
 }
 
 // Download downloads a resource using the strategy selected during inspection.
-func (d *HttpDownloader) Download(ctx context.Context, options download.Options) error {
+func (d *HttpDownloader) Download(ctx context.Context, options download.Options, lifecycle download.Lifecycle) error {
 	if options.Strategy.Equal(valueobject.SingleDownloadStrategy()) {
-		return d.downloadSequential(ctx, options)
+		return d.downloadSequential(ctx, options, lifecycle)
 	}
 
 	if options.Strategy.Equal(valueobject.StreamDownloadStrategy()) {
@@ -39,7 +46,7 @@ func (d *HttpDownloader) Download(ctx context.Context, options download.Options)
 	}
 
 	if options.Strategy.Equal(valueobject.ParallelDownloadStrategy()) {
-		return d.downloadParallel(ctx, options)
+		return d.downloadParallel(ctx, options, lifecycle)
 	}
 
 	return nil
