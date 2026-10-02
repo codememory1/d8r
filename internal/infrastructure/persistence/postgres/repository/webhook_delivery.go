@@ -21,6 +21,7 @@ var _ repository.WebhookDeliveryRepository = (*WebhookDeliveryRepository)(nil)
 type webhookDeliveryModel struct {
 	ID             string     `db:"id"`
 	WebhookID      string     `db:"webhook_id"`
+	SequenceKey    *string    `db:"sequence_key"`
 	EventType      string     `db:"event_type"`
 	Payload        []byte     `db:"payload"`
 	Status         string     `db:"status"`
@@ -83,6 +84,7 @@ func (r *WebhookDeliveryRepository) Save(ctx context.Context, delivery *entity.W
 		SetMap(map[string]any{
 			"id":              delivery.ID().String(),
 			"webhook_id":      delivery.WebhookID().String(),
+			"sequence_key":    delivery.SequenceKey(),
 			"event_type":      delivery.EventType().String(),
 			"payload":         delivery.Payload(),
 			"status":          string(delivery.Status()),
@@ -147,16 +149,24 @@ func (r *WebhookDeliveryRepository) ClaimPending(ctx context.Context, limit int,
 		WITH filtered_webhook_deliveries AS (
 			SELECT
 				id
-			FROM webhook_deliveries
-			WHERE status = $1 
-				AND next_attempt_at <= NOW()
-				AND attempts <= $2
+			FROM webhook_deliveries wd
+			WHERE wd.status = @pending_status
+				AND wd.next_attempt_at <= NOW()
+				AND wd.attempts <= @attempts
+				AND NOT EXISTS (
+					SELECT
+						1
+					FROM webhook_deliveries wd2
+					WHERE wd2.id < wd.id
+						AND wd2.sequence_key = wd.sequence_key
+						AND wd2.status IN (@pending_status, @processing_status)
+				)
 			ORDER BY id ASC
-			LIMIT $3
+			LIMIT @limit
 			FOR UPDATE SKIP LOCKED
 		)
 		UPDATE webhook_deliveries wd
-		SET status = $4,
+		SET status = @processing_status,
 			version = version + 1,
 			updated_at = NOW()
 		FROM filtered_webhook_deliveries fwd
@@ -166,12 +176,12 @@ func (r *WebhookDeliveryRepository) ClaimPending(ctx context.Context, limit int,
 
 	var models []webhookDeliveryModel
 
-	err := pgxscan.Select(ctx, r.connection, &models, sql, []any{
-		entity.WebhookDeliveryStatusPending,
-		maxAttempts,
-		limit,
-		entity.WebhookDeliveryStatusProcessing,
-	}...)
+	err := pgxscan.Select(ctx, r.connection, &models, sql, pgx.NamedArgs{
+		"pending_status":    entity.WebhookDeliveryStatusPending,
+		"processing_status": entity.WebhookDeliveryStatusProcessing,
+		"attempts":          maxAttempts,
+		"limit":             limit,
+	})
 
 	if err != nil {
 		return nil, err
@@ -216,6 +226,7 @@ func (m webhookDeliveryModel) toDomainEntity() (*entity.WebhookDelivery, error) 
 	return entity.UnmarshalWebhookDelivery(
 		id,
 		webhookID,
+		m.SequenceKey,
 		eventType,
 		m.Payload,
 		m.Status,
