@@ -33,7 +33,12 @@ func NewDeliveryCreator(
 }
 
 // Create saves a delivery for each matching webhook in one transaction.
-func (h *DeliveryCreator) Create(ctx context.Context, eventType valueobject.WebhookEventType, payload json.RawMessage) error {
+func (h *DeliveryCreator) Create(
+	ctx context.Context,
+	eventType valueobject.WebhookEventType,
+	sequenceKey *string,
+	payload json.RawMessage,
+) error {
 	// Select only enabled webhooks subscribed to this event type.
 	webhooks, err := h.webhookRepository.FindEnabledByEventType(ctx, eventType)
 
@@ -51,6 +56,7 @@ func (h *DeliveryCreator) Create(ctx context.Context, eventType valueobject.Webh
 
 			err = h.webhookDeliveryRepository.Save(ctx, entity.NewWebhookDelivery(
 				webhook.ID(),
+				sequenceKey,
 				eventType,
 				payload,
 			))
