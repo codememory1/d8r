@@ -84,7 +84,7 @@ func (h *InspectTaskHandler) Handle(ctx context.Context, cmd InspectTask) (value
 			return h.eventPublisher.Publish(ctx, domainevent.NewTaskInspectionFailed(
 				cmd.TaskID,
 				time.Now(),
-			))
+			), new(cmd.TaskID.String()))
 		})
 
 		if transactionErr != nil {
@@ -126,7 +126,7 @@ func (h *InspectTaskHandler) Handle(ctx context.Context, cmd InspectTask) (value
 			cmd.TaskID,
 			taskInspection.ID(),
 			time.Now(),
-		))
+		), new(cmd.TaskID.String()))
 	})
 
 	if err != nil {

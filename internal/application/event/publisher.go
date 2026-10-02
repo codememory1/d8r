@@ -9,5 +9,5 @@ import (
 // Publisher publishes domain events for asynchronous processing.
 type Publisher interface {
 	// Publish publishes the provided domain event.
-	Publish(ctx context.Context, event ddd.Event) error
+	Publish(ctx context.Context, event ddd.Event, sequenceKey *string) error
 }

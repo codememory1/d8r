@@ -7,19 +7,21 @@ import (
 
 // messageRow represents an outbox message loaded from PostgreSQL.
 type messageRow struct {
-	ID        string `db:"id"`
-	EventType string `db:"event_type"`
-	Payload   []byte `db:"payload"`
-	Version   int64  `db:"version"`
+	ID          string  `db:"id"`
+	SequenceKey *string `db:"sequence_key"`
+	EventType   string  `db:"event_type"`
+	Payload     []byte  `db:"payload"`
+	Version     int64   `db:"version"`
 }
 
 // toMessage converts the persistence model into an infrastructure outbox
 // message.
 func (r messageRow) toMessage() infraoutbox.Message {
 	return infraoutbox.Message{
-		ID:        r.ID,
-		EventType: ddd.EventType(r.EventType),
-		Payload:   r.Payload,
-		Version:   r.Version,
+		ID:          r.ID,
+		SequenceKey: r.SequenceKey,
+		EventType:   ddd.EventType(r.EventType),
+		Payload:     r.Payload,
+		Version:     r.Version,
 	}
 }
