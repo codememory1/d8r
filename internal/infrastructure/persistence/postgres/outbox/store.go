@@ -7,32 +7,10 @@ import (
 	infraoutbox "github.com/codememory1/d8r/internal/infrastructure/outbox"
 	"github.com/codememory1/d8r/internal/infrastructure/persistence/postgres"
 	"github.com/georgysavva/scany/v2/pgxscan"
+	"github.com/jackc/pgx/v5"
 )
 
 var _ infraoutbox.Store = (*Store)(nil)
-
-const claimPendingSQL = `
-    WITH pending_messages AS (
-        SELECT id
-        FROM outbox_events
-        WHERE status = $1
-        ORDER BY created_at ASC, id ASC
-        LIMIT $2
-        FOR UPDATE SKIP LOCKED
-    )
-    UPDATE outbox_events oe
-    SET
-        status = $3,
-        version = version + 1,
-        updated_at = NOW()
-    FROM pending_messages
-    WHERE oe.id = pending_messages.id
-    RETURNING
-        oe.id,
-        oe.event_type,
-        oe.payload,
-        oe.version
-`
 
 // Store provides PostgreSQL persistence operations for outbox messages.
 type Store struct {
@@ -54,15 +32,34 @@ func (s *Store) ClaimPending(ctx context.Context, limit int) ([]infraoutbox.Mess
 
 	var rows []messageRow
 
-	err := pgxscan.Select(
-		ctx,
-		s.connection,
-		&rows,
-		claimPendingSQL,
-		infraoutbox.StatusPending,
-		limit,
-		infraoutbox.StatusProcessing,
-	)
+	sql := `
+		WITH pending_messages AS (
+			SELECT id
+			FROM outbox_events
+			WHERE status = @pending_status
+			ORDER BY id ASC
+			LIMIT @limit
+			FOR UPDATE SKIP LOCKED
+		)
+		UPDATE outbox_events oe
+		SET
+			status = @processing_status,
+			version = version + 1,
+			updated_at = NOW()
+		FROM pending_messages
+		WHERE oe.id = pending_messages.id
+		RETURNING
+			oe.id,
+			oe.event_type,
+			oe.payload,
+			oe.version
+	`
+
+	err := pgxscan.Select(ctx, s.connection, &rows, sql, pgx.NamedArgs{
+		"pending_status":    infraoutbox.StatusPending,
+		"limit":             limit,
+		"processing_status": infraoutbox.StatusProcessing,
+	})
 
 	if err != nil {
 		return nil, err
