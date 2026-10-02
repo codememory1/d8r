@@ -89,6 +89,7 @@ type WebhookDelivery struct {
 
 	id             valueobject.ID
 	webhookID      valueobject.ID
+	sequenceKey    *string
 	eventType      valueobject.WebhookEventType
 	payload        json.RawMessage
 	status         WebhookDeliveryStatus
@@ -104,6 +105,7 @@ type WebhookDelivery struct {
 // NewWebhookDelivery creates a pending webhook delivery ready for its first attempt.
 func NewWebhookDelivery(
 	webhookID valueobject.ID,
+	sequenceKey *string,
 	eventType valueobject.WebhookEventType,
 	payload json.RawMessage,
 ) *WebhookDelivery {
@@ -112,6 +114,7 @@ func NewWebhookDelivery(
 	return &WebhookDelivery{
 		id:            valueobject.NewID(),
 		webhookID:     webhookID,
+		sequenceKey:   sequenceKey,
 		eventType:     eventType,
 		payload:       append(json.RawMessage(nil), payload...),
 		status:        WebhookDeliveryStatusPending,
@@ -126,6 +129,7 @@ func NewWebhookDelivery(
 func UnmarshalWebhookDelivery(
 	id valueobject.ID,
 	webhookID valueobject.ID,
+	sequenceKey *string,
 	eventType valueobject.WebhookEventType,
 	payload json.RawMessage,
 	status string,
@@ -148,6 +152,7 @@ func UnmarshalWebhookDelivery(
 		AggregateVersion: ddd.NewAggregateVersion(version),
 		id:               id,
 		webhookID:        webhookID,
+		sequenceKey:      sequenceKey,
 		eventType:        eventType,
 		payload:          payload,
 		status:           webhookDeliveryStatus,
@@ -169,6 +174,11 @@ func (w *WebhookDelivery) ID() valueobject.ID {
 // WebhookID returns the identifier of the target webhook.
 func (w *WebhookDelivery) WebhookID() valueobject.ID {
 	return w.webhookID
+}
+
+// SequenceKey returns the current delivery sequence key.
+func (w *WebhookDelivery) SequenceKey() *string {
+	return w.sequenceKey
 }
 
 // EventType returns the type of webhook event being delivered.

@@ -32,8 +32,9 @@ func (h *CreateWebhookDeliveryHandler) Handle(ctx context.Context, event ddd.Eve
 		return fmt.Errorf("expected *event.TaskDownloadProgress, got %T", event)
 	}
 
+	taskID := progressEvent.TaskID.String()
 	webhookPayload, err := json.Marshal(payload.TaskDownloadProgress{
-		TaskID:          progressEvent.TaskID.String(),
+		TaskID:          taskID,
 		DownloadedBytes: progressEvent.DownloadedBytes,
 		TotalBytes:      progressEvent.TotalBytes,
 		ActiveRequests:  progressEvent.ActiveRequests,
@@ -43,5 +44,10 @@ func (h *CreateWebhookDeliveryHandler) Handle(ctx context.Context, event ddd.Eve
 		return err
 	}
 
-	return h.webhookDeliveryCreator.Create(ctx, valueobject.WebhookEventTaskDownloadProgress, webhookPayload)
+	return h.webhookDeliveryCreator.Create(
+		ctx,
+		valueobject.WebhookEventTaskDownloadProgress,
+		&taskID,
+		webhookPayload,
+	)
 }

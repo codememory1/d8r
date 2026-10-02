@@ -40,10 +40,16 @@ func (p *Publisher) Publish(ctx context.Context, event ddd.Event) error {
 		return err
 	}
 
+	id, err := uuid.NewV7()
+
+	if err != nil {
+		return err
+	}
+
 	sql, args, err := sq.
 		Insert("outbox_events").
 		SetMap(map[string]any{
-			"id":         uuid.NewString(),
+			"id":         id.String(),
 			"event_type": event.Type(),
 			"payload":    string(payload),
 			"status":     infraoutbox.StatusPending,
