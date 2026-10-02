@@ -34,10 +34,19 @@ func (s *Store) ClaimPending(ctx context.Context, limit int) ([]infraoutbox.Mess
 
 	sql := `
 		WITH pending_messages AS (
-			SELECT id
-			FROM outbox_events
+			SELECT 
+				oe.id
+			FROM outbox_events oe
 			WHERE status = @pending_status
-			ORDER BY id ASC
+				AND NOT EXISTS (
+					SELECT
+						1
+					FROM outbox_events oe2
+					WHERE oe2.id < oe.id
+						AND oe2.sequence_key = oe.sequence_key
+						AND oe2.status IN (@pending_status, @processing_status)
+				)
+			ORDER BY oe.id ASC
 			LIMIT @limit
 			FOR UPDATE SKIP LOCKED
 		)
