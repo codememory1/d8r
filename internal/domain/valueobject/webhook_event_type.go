@@ -36,6 +36,9 @@ const (
 
 	// WebhookEventTaskDownloadFailed is emitted when resource downloading fails.
 	WebhookEventTaskDownloadFailed = "task.download.failed"
+
+	// WebhookEventTaskDownloadProgress is emitted to report resource download progress.
+	WebhookEventTaskDownloadProgress = "task.download.progress"
 )
 
 // WebhookEventType identifies an event that can trigger a webhook.
@@ -50,7 +53,8 @@ func NewWebhookEventType(eventType string) (WebhookEventType, error) {
 		WebhookEventTaskInspectionFailed,
 		WebhookEventTaskDownloadStarted,
 		WebhookEventTaskDownloadCompleted,
-		WebhookEventTaskDownloadFailed:
+		WebhookEventTaskDownloadFailed,
+		WebhookEventTaskDownloadProgress:
 		return WebhookEventType(eventType), nil
 	default:
 		return "", ErrInvalidWebhookEventType
