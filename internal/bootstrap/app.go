@@ -11,6 +11,7 @@ import (
 	"github.com/codememory1/d8r/internal/application/eventhandler/taskcreated"
 	"github.com/codememory1/d8r/internal/application/eventhandler/taskdownloadcompleted"
 	"github.com/codememory1/d8r/internal/application/eventhandler/taskdownloadfailed"
+	"github.com/codememory1/d8r/internal/application/eventhandler/taskdownloadprogress"
 	"github.com/codememory1/d8r/internal/application/eventhandler/taskdownloadstarted"
 	"github.com/codememory1/d8r/internal/application/eventhandler/taskinspectioncompleted"
 	"github.com/codememory1/d8r/internal/application/eventhandler/taskinspectionfailed"
@@ -134,6 +135,11 @@ type TaskDownloadFailedEventHandlers struct {
 	CreateWebhookDelivery *taskdownloadfailed.CreateWebhookDeliveryHandler
 }
 
+// TaskDownloadProgressEventHandlers contains reactions to the task.download.progress domain event.
+type TaskDownloadProgressEventHandlers struct {
+	CreateWebhookDelivery *taskdownloadprogress.CreateWebhookDeliveryHandler
+}
+
 // EventHandlers contains application handlers for domain events.
 type EventHandlers struct {
 	TaskCreated             TaskCreatedEventHandlers
@@ -143,6 +149,7 @@ type EventHandlers struct {
 	TaskDownloadStarted     TaskDownloadStartedEventHandlers
 	TaskDownloadCompleted   TaskDownloadCompletedEventHandlers
 	TaskDownloadFailed      TaskDownloadFailedEventHandlers
+	TaskDownloadProgress    TaskDownloadProgressEventHandlers
 }
 
 // Controllers contains the application's HTTP controllers.
@@ -326,6 +333,10 @@ func (a *App) registerEventFactories() {
 	a.Services.EventRegistry.Register(domainevent.TaskDownloadFailedType, func() ddd.Event {
 		return &domainevent.TaskDownloadFailed{}
 	})
+
+	a.Services.EventRegistry.Register(domainevent.TaskDownloadProgressType, func() ddd.Event {
+		return &domainevent.TaskDownloadProgress{}
+	})
 }
 
 // subscribeEventHandlers connects domain event types to their application handlers.
@@ -337,6 +348,7 @@ func (a *App) subscribeEventHandlers() {
 	a.Services.EventDispatcher.Subscribe(domainevent.TaskDownloadStartedType, a.EventHandlers.TaskDownloadStarted.CreateWebhookDelivery)
 	a.Services.EventDispatcher.Subscribe(domainevent.TaskDownloadCompletedType, a.EventHandlers.TaskDownloadCompleted.CreateWebhookDelivery)
 	a.Services.EventDispatcher.Subscribe(domainevent.TaskDownloadFailedType, a.EventHandlers.TaskDownloadFailed.CreateWebhookDelivery)
+	a.Services.EventDispatcher.Subscribe(domainevent.TaskDownloadProgressType, a.EventHandlers.TaskDownloadProgress.CreateWebhookDelivery)
 }
 
 // initPersistence initializes repository and task-claiming implementations.
@@ -451,6 +463,10 @@ func (a *App) initEventHandlers() {
 	)
 
 	a.EventHandlers.TaskDownloadFailed.CreateWebhookDelivery = taskdownloadfailed.NewCreateWebhookDeliveryHandler(
+		a.Services.WebhookDeliveryCreator,
+	)
+
+	a.EventHandlers.TaskDownloadProgress.CreateWebhookDelivery = taskdownloadprogress.NewCreateWebhookDeliveryHandler(
 		a.Services.WebhookDeliveryCreator,
 	)
 }

@@ -3,15 +3,19 @@ package command
 import (
 	"context"
 	"errors"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/codememory1/d8r/internal/application/download"
 	"github.com/codememory1/d8r/internal/application/event"
 	"github.com/codememory1/d8r/internal/application/transaction"
+	"github.com/codememory1/d8r/internal/domain/entity"
 	domainevent "github.com/codememory1/d8r/internal/domain/event"
 	"github.com/codememory1/d8r/internal/domain/repository"
 	"github.com/codememory1/d8r/internal/domain/valueobject"
 	"github.com/codememory1/d8r/pkg/cqrs"
+	"github.com/codememory1/d8r/pkg/optional"
 )
 
 var _ cqrs.CommandHandler[DownloadTask, struct{}] = (*DownloadTaskHandler)(nil)
@@ -82,9 +86,15 @@ func (h *DownloadTaskHandler) Handle(ctx context.Context, cmd DownloadTask) (str
 	}
 
 	// Build lifecycle callbacks for the download.
-	lifecycle := h.buildLifecycle(ctx, cmd.TaskID)
+	lifecycle, finishLifecycle := h.buildLifecycle(ctx, cmd.TaskID, *taskInspection)
+	defer finishLifecycle()
 
-	if downloadErr := h.downloader.Download(ctx, options, lifecycle); downloadErr != nil {
+	downloadErr := h.downloader.Download(ctx, options, lifecycle)
+
+	// Stop progress publishing and wait for the final callback to finish.
+	finishLifecycle()
+
+	if downloadErr != nil {
 		// Propagate context cancellation without marking the task as failed.
 		if ctx.Err() != nil {
 			return struct{}{}, ctx.Err()
@@ -112,7 +122,7 @@ func (h *DownloadTaskHandler) Handle(ctx context.Context, cmd DownloadTask) (str
 			return struct{}{}, errors.Join(downloadErr, transactionErr)
 		}
 
-		return struct{}{}, err
+		return struct{}{}, downloadErr
 	}
 
 	// Mark the task as completed after a successful download.
@@ -139,7 +149,90 @@ func (h *DownloadTaskHandler) Handle(ctx context.Context, cmd DownloadTask) (str
 	return struct{}{}, nil
 }
 
-// buildLifecycle builds download lifecycle callbacks for the specified task.
-func (h *DownloadTaskHandler) buildLifecycle(ctx context.Context, taskID valueobject.ID) download.Lifecycle {
-	return download.Lifecycle{}
+// buildLifecycle builds download lifecycle callbacks and starts periodic progress publishing.
+// It returns the lifecycle and a function that stops publishing and waits for the worker to finish.
+func (h *DownloadTaskHandler) buildLifecycle(ctx context.Context, taskID valueobject.ID, inspection entity.TaskInspection) (download.Lifecycle, func()) {
+	// Track counters updated concurrently by download callbacks.
+	var downloadedBytes atomic.Int64
+	var activeRequests atomic.Int64
+
+	// Keep the last successfully published values.
+	// These variables are accessed only by the publishing worker.
+	var oldDownloadedBytes int64
+	var oldActiveRequests int64
+
+	stopPublishing := h.startPeriodic(ctx, 1, func() {
+		// Capture the current counters for comparison and publishing.
+		currentDownloadedBytes := downloadedBytes.Load()
+		currentActiveRequests := activeRequests.Load()
+
+		// Skip event publication if there have been no changes since the last publication.
+		if currentDownloadedBytes != oldDownloadedBytes || currentActiveRequests != oldActiveRequests {
+			// Publish the captured progress snapshot.
+			publishErr := h.eventPublisher.Publish(ctx, domainevent.NewTaskDownloadProgress(
+				taskID,
+				currentDownloadedBytes,
+				optional.Map(inspection.Size(), valueobject.ByteSize.Int64),
+				activeRequests.Load(),
+			))
+
+			// Update the previous values only after successful publishing.
+			// On failure, leave them unchanged so a later tick can retry.
+			if publishErr == nil {
+				oldDownloadedBytes = currentDownloadedBytes
+				oldActiveRequests = currentActiveRequests
+			}
+		}
+	})
+
+	return download.Lifecycle{
+		OnProgress: func(writtenBytes int64) {
+			downloadedBytes.Add(writtenBytes)
+		},
+		OnActiveRequestsChanged: func(delta int64) {
+			activeRequests.Add(delta)
+		},
+	}, stopPublishing
+}
+
+// startPeriodic runs onTick periodically until the context is canceled or a stop signal is received.
+// It returns a function that signals the worker to stop and waits for it to finish.
+func (h *DownloadTaskHandler) startPeriodic(ctx context.Context, interval time.Duration, onTick func()) func() {
+	var wg sync.WaitGroup
+	var stopOnce sync.Once
+
+	// Closing this channel signals the worker to stop.
+	stopCh := make(chan struct{})
+
+	// Register the worker before starting its goroutine.
+	wg.Add(1)
+
+	go func() {
+		// Notify waiting callers when the worker exits.
+		defer wg.Done()
+
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-stopCh:
+				onTick()
+
+				return
+			case <-ticker.C:
+				onTick()
+			}
+		}
+	}()
+
+	return func() {
+		stopOnce.Do(func() {
+			close(stopCh)
+		})
+
+		wg.Wait()
+	}
 }
