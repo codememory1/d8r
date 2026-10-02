@@ -115,7 +115,7 @@ func (h *DownloadTaskHandler) Handle(ctx context.Context, cmd DownloadTask) (str
 			return h.eventPublisher.Publish(ctx, domainevent.NewTaskDownloadFailed(
 				task.ID(),
 				time.Now(),
-			))
+			), new(task.ID().String()))
 		})
 
 		if transactionErr != nil {
@@ -139,7 +139,7 @@ func (h *DownloadTaskHandler) Handle(ctx context.Context, cmd DownloadTask) (str
 		return h.eventPublisher.Publish(ctx, domainevent.NewTaskDownloadCompleted(
 			task.ID(),
 			time.Now(),
-		))
+		), new(task.ID().String()))
 	})
 
 	if transactionErr != nil {
@@ -174,7 +174,7 @@ func (h *DownloadTaskHandler) buildLifecycle(ctx context.Context, taskID valueob
 				currentDownloadedBytes,
 				optional.Map(inspection.Size(), valueobject.ByteSize.Int64),
 				activeRequests.Load(),
-			))
+			), new(taskID.String()))
 
 			// Update the previous values only after successful publishing.
 			// On failure, leave them unchanged so a later tick can retry.

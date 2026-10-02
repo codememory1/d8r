@@ -73,7 +73,7 @@ func (h *DownloadReadyTasksHandler) Handle(ctx context.Context, cmd DownloadRead
 			publishErr := h.eventPublisher.Publish(ctx, domainevent.NewTaskDownloadStarted(
 				taskID,
 				time.Now(),
-			))
+			), new(taskID.String()))
 
 			if publishErr != nil {
 				return fmt.Errorf(

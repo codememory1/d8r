@@ -25,8 +25,9 @@ const (
 
 // Message represents a persisted domain event claimed from the outbox.
 type Message struct {
-	ID        string
-	EventType ddd.EventType
-	Payload   json.RawMessage
-	Version   int64
+	ID          string
+	SequenceKey *string
+	EventType   ddd.EventType
+	Payload     json.RawMessage
+	Version     int64
 }

@@ -70,7 +70,10 @@ func (h *InspectPendingTasksHandler) Handle(ctx context.Context, cmd InspectPend
 		}
 
 		for _, taskID := range taskIDs {
-			publishErr := h.eventPublisher.Publish(ctx, domainevent.NewTaskInspectionStarted(taskID, time.Now()))
+			publishErr := h.eventPublisher.Publish(ctx, domainevent.NewTaskInspectionStarted(
+				taskID,
+				time.Now(),
+			), new(taskID.String()))
 
 			if publishErr != nil {
 				return fmt.Errorf("failed event publication for task: %s: %w", taskID, publishErr)

@@ -33,7 +33,7 @@ func NewPublisher(
 }
 
 // Publish serializes and stores a domain event as a pending outbox message.
-func (p *Publisher) Publish(ctx context.Context, event ddd.Event) error {
+func (p *Publisher) Publish(ctx context.Context, event ddd.Event, sequenceKey *string) error {
 	payload, err := p.encoder.Encode(event)
 
 	if err != nil {
@@ -49,11 +49,12 @@ func (p *Publisher) Publish(ctx context.Context, event ddd.Event) error {
 	sql, args, err := sq.
 		Insert("outbox_events").
 		SetMap(map[string]any{
-			"id":         id.String(),
-			"event_type": event.Type(),
-			"payload":    string(payload),
-			"status":     infraoutbox.StatusPending,
-			"created_at": time.Now(),
+			"id":           id.String(),
+			"sequence_key": sequenceKey,
+			"event_type":   event.Type(),
+			"payload":      string(payload),
+			"status":       infraoutbox.StatusPending,
+			"created_at":   time.Now(),
 		}).
 		PlaceholderFormat(sq.Dollar).
 		ToSql()

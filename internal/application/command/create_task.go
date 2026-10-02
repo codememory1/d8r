@@ -58,8 +58,10 @@ func (h *CreateTaskHandler) Handle(ctx context.Context, cmd CreateTask) (valueob
 		}
 
 		for _, event := range events {
-			if err := h.eventPublisher.Publish(ctx, event); err != nil {
-				return err
+			publishErr := h.eventPublisher.Publish(ctx, event, new(task.ID().String()))
+
+			if publishErr != nil {
+				return publishErr
 			}
 		}
 
