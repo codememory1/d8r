@@ -130,11 +130,11 @@ func defaults() Config {
 				Limit:       20,
 			},
 			OutboxEventWorker{
-				Concurrency: 5,
+				Concurrency: 3,
 				Limit:       20,
 			},
 			WebhookDeliveryWorker{
-				Concurrency: 5,
+				Concurrency: 3,
 				Limit:       20,
 			},
 		},
