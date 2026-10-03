@@ -394,6 +394,7 @@ func (a *App) initCommandHandlers() {
 		a.Repositories.Task,
 		a.Repositories.TaskInspection,
 		a.Services.Downloader,
+		a.Config.Download.ProgressInterval,
 	)
 
 	a.CommandHandlers.CreateWebhook = command.NewCreateWebhookHandler(

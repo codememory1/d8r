@@ -32,6 +32,7 @@ type DownloadTaskHandler struct {
 	taskRepository           repository.TaskRepository
 	taskInspectionRepository repository.TaskInspectionRepository
 	downloader               download.Downloader
+	progressInterval         time.Duration
 }
 
 // NewDownloadTaskHandler creates a handler for processing download tasks.
@@ -41,6 +42,7 @@ func NewDownloadTaskHandler(
 	taskRepository repository.TaskRepository,
 	taskInspectionRepository repository.TaskInspectionRepository,
 	downloader download.Downloader,
+	progressInterval time.Duration,
 ) *DownloadTaskHandler {
 	return &DownloadTaskHandler{
 		tm:                       tm,
@@ -48,6 +50,7 @@ func NewDownloadTaskHandler(
 		taskRepository:           taskRepository,
 		taskInspectionRepository: taskInspectionRepository,
 		downloader:               downloader,
+		progressInterval:         progressInterval,
 	}
 }
 
@@ -161,7 +164,7 @@ func (h *DownloadTaskHandler) buildLifecycle(ctx context.Context, taskID valueob
 	var oldDownloadedBytes int64
 	var oldActiveRequests int64
 
-	stopPublishing := h.startPeriodic(ctx, 1, func() {
+	stopPublishing := h.startPeriodic(ctx, h.progressInterval, func() {
 		// Capture the current counters for comparison and publishing.
 		currentDownloadedBytes := downloadedBytes.Load()
 		currentActiveRequests := activeRequests.Load()
