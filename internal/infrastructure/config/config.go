@@ -44,12 +44,13 @@ type Retry struct {
 
 // Download contains resource inspection and downloading configuration.
 type Download struct {
-	MinParallelSize  ByteSize `yaml:"min_parallel_size"`
-	BufferSize       ByteSize `yaml:"buffer_size"`
-	PartSize         ByteSize `yaml:"part_size"`
-	MaxParallelParts int      `yaml:"max_parallel_parts"`
-	RangeParts       int      `yaml:"range_parts"`
-	Retry            Retry    `yaml:"retry"`
+	MinParallelSize  ByteSize      `yaml:"min_parallel_size"`
+	BufferSize       ByteSize      `yaml:"buffer_size"`
+	PartSize         ByteSize      `yaml:"part_size"`
+	MaxParallelParts int           `yaml:"max_parallel_parts"`
+	RangeParts       int           `yaml:"range_parts"`
+	Retry            Retry         `yaml:"retry"`
+	ProgressInterval time.Duration `yaml:"progress_interval"`
 }
 
 // Workers contains configuration for all background workers.
@@ -119,6 +120,7 @@ func defaults() Config {
 				MaxAttempts: 3,
 				Delay:       10 * time.Millisecond,
 			},
+			ProgressInterval: 5 * time.Second,
 		},
 		Workers: Workers{
 			DownloadWorker{

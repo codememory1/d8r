@@ -29,8 +29,9 @@ func Execute(ctx context.Context) error {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
-	
+
 	root.AddCommand(rt.newServerCommand())
+	root.AddCommand(rt.newDownloadCommand())
 
 	root.PersistentFlags().StringVarP(
 		&rt.configuration,
