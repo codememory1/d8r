@@ -42,7 +42,7 @@ func (d *HttpDownloader) Download(ctx context.Context, options download.Options,
 	}
 
 	if options.Strategy.Equal(valueobject.StreamDownloadStrategy()) {
-		return nil
+		return d.downloadStream(ctx, options, lifecycle)
 	}
 
 	if options.Strategy.Equal(valueobject.ParallelDownloadStrategy()) {
