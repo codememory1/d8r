@@ -1,4 +1,4 @@
-package cli
+package command
 
 import (
 	"context"
@@ -30,8 +30,8 @@ func Execute(ctx context.Context) error {
 		SilenceErrors: true,
 	}
 
-	root.AddCommand(rt.newServerCommand())
-	root.AddCommand(rt.newDownloadCommand())
+	root.AddCommand(NewServerCommand(rt.withApp))
+	root.AddCommand(NewDownloadCommand(rt.withApp))
 
 	root.PersistentFlags().StringVarP(
 		&rt.configuration,
