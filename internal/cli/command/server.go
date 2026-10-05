@@ -1,4 +1,4 @@
-package cli
+package command
 
 import (
 	"context"
@@ -12,43 +12,38 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// newServerCommand creates the command that starts the HTTP server.
-func (rt *runtime) newServerCommand() *cobra.Command {
+func NewServerCommand(withApp WithApp) *cobra.Command {
 	return &cobra.Command{
 		Use:   "server",
 		Short: "Run the server",
-		RunE:  rt.runServer,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return withApp(cmd, func(ctx context.Context, app *bootstrap.App) error {
+				server, serveErr, err := serveHTTP(app)
+				workerErr := runWorkers(ctx, app)
+
+				if err != nil {
+					return err
+				}
+
+				select {
+				case <-ctx.Done():
+					return shutdownHTTP(server)
+				case err := <-serveErr:
+					if errors.Is(err, http.ErrServerClosed) {
+						return nil
+					}
+
+					return err
+				case err := <-workerErr:
+					if shutdownErr := shutdownHTTP(server); err != nil {
+						return errors.Join(err, shutdownErr)
+					}
+
+					return err
+				}
+			})
+		},
 	}
-}
-
-// runServer starts the HTTP server and gracefully shuts it down when the
-// command context is canceled.
-func (rt *runtime) runServer(cmd *cobra.Command, _ []string) error {
-	return rt.withApp(cmd, func(ctx context.Context, app *bootstrap.App) error {
-		server, serveErr, err := serveHTTP(app)
-		workerErr := runWorkers(ctx, app)
-
-		if err != nil {
-			return err
-		}
-
-		select {
-		case <-ctx.Done():
-			return shutdownHTTP(server)
-		case err := <-serveErr:
-			if errors.Is(err, http.ErrServerClosed) {
-				return nil
-			}
-
-			return err
-		case err := <-workerErr:
-			if shutdownErr := shutdownHTTP(server); err != nil {
-				return errors.Join(err, shutdownErr)
-			}
-
-			return err
-		}
-	})
 }
 
 // serveHTTP starts the HTTP server and returns a channel through which its
