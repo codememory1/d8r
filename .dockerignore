@@ -1,0 +1,8 @@
+.git/
+compose.yaml
+compose.yml
+docker-compose*.yml
+config/config-dev.yaml
+.env
+.env.*
+files/

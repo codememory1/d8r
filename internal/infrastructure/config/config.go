@@ -304,5 +304,9 @@ func (c WebhookDeliveryWorker) Validate() error {
 		return errors.New("workers.webhook_delivery must be greater than 0")
 	}
 
+	if c.Limit <= 0 {
+		return errors.New("workers.webhook_delivery.limit must be greater than 0")
+	}
+
 	return nil
 }
