@@ -1,6 +1,6 @@
+# PostgreSQL connection settings.
 postgres:
-  # PostgreSQL hostname.
-  # Use "postgres" only when the application runs inside Docker Compose.
+  # PostgreSQL hostname. Use "postgres" when the application runs inside Docker Compose.
   host: "localhost"
 
   # PostgreSQL server port.
@@ -9,16 +9,15 @@ postgres:
   # Database user.
   user: "root"
 
-  # Database password.
-  # Suitable only for local development.
+  # Database password. Suitable only for local development.
   password: "admin"
 
   # Database name.
   database: "postgres"
 
+# HTTP server settings.
 http:
-  # Address on which the HTTP server listens.
-  # 0.0.0.0 makes it available on all network interfaces.
+  # Address on which the HTTP server listens. 0.0.0.0 allows all network interfaces.
   address: "0.0.0.0"
 
   # HTTP server port.
@@ -33,6 +32,7 @@ http:
   # Maximum duration to keep an idle connection open.
   idle_timeout: "20s"
 
+# Resource inspection and download settings.
 download:
   # Minimum resource size required to consider parallel downloading.
   min_parallel_size: "50MiB"
@@ -49,19 +49,53 @@ download:
   # Number of byte ranges into which a resource is divided.
   range_parts: 5
 
+  # Retry settings for HTTP downloads.
+  retry:
+    # Maximum number of attempts, including the initial attempt.
+    max_attempts: 3
+
+    # Delay between attempts.
+    delay: "10ms"
+
+  # Interval between periodic download progress publications.
+  progress_interval: "5s"
+
+# Background worker settings.
 workers:
+  # Download task worker settings.
   download:
     # Maximum number of download tasks processed concurrently.
     concurrency: 5
 
+    # Maximum number of download tasks claimed in one batch.
+    limit: 20
+
+  # Task inspection worker settings.
   inspection:
     # Maximum number of task inspections processed concurrently.
     concurrency: 5
 
-webhook:
-  # Maximum number of webhook deliveries processed concurrently.
-  concurrency: 10
+    # Maximum number of tasks claimed for inspection in one batch.
+    limit: 20
 
+  # Outbox event worker settings.
+  outbox_event:
+    # Maximum number of outbox events processed concurrently.
+    concurrency: 3
+
+    # Maximum number of outbox events claimed in one batch.
+    limit: 20
+
+  # Webhook delivery worker settings.
+  webhook_delivery:
+    # Maximum number of webhook deliveries processed concurrently.
+    concurrency: 10
+
+    # Maximum number of webhook deliveries claimed in one batch.
+    limit: 20
+
+# Webhook request and retry settings.
+webhook:
   # Maximum duration allowed for a single webhook HTTP request.
   request_timeout: "10s"
 
@@ -69,5 +103,4 @@ webhook:
   max_attempts: 5
 
   # Initial delay before retrying a failed webhook delivery.
-  # The actual delay may increase with each subsequent attempt.
   retry_delay: "5s"

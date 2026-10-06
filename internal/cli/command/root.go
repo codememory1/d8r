@@ -31,7 +31,6 @@ func Execute(ctx context.Context) error {
 	}
 
 	root.AddCommand(NewServerCommand(rt.withApp))
-	root.AddCommand(NewDownloadCommand(rt.withApp))
 
 	root.PersistentFlags().StringVarP(
 		&rt.configuration,
